@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Builds
+dist/
+build/
+*.tsbuildinfo
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local uploads (development storage adapter)
+backend/uploads/
+backend/.local-storage*/
+
+# Tests
+coverage/
+playwright-report/
+test-results/
+blob-report/
+e2e/.auth/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+# Configuración de pruebas sin secretos reales (BD local efímera)
+!backend/.env.test

@@ -1,0 +1,619 @@
+// Booking SaaS — esquema multi-tenant.
+//
+// Reglas de aislamiento:
+// - Toda entidad perteneciente a un negocio lleva `businessId`.
+// - Las relaciones entre entidades del mismo tenant usan claves foráneas compuestas
+//   (id, businessId) para que PostgreSQL rechace referencias cruzadas entre negocios.
+// - Los instantes se guardan en UTC (timestamptz). Los horarios recurrentes se guardan
+//   como minutos locales desde medianoche en la zona horaria de la sucursal.
+// - Las restricciones que Prisma no expresa (exclusión de solapamientos, CHECKs, RLS)
+//   viven en migraciones SQL escritas a mano.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = []
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// ─────────────────────────────── Enums ───────────────────────────────
+
+enum BusinessType {
+  BARBERSHOP
+  BEAUTY_SALON
+  NAIL_STUDIO
+  AESTHETICS
+  SPA
+  OTHER
+}
+
+enum BusinessStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  STAFF
+}
+
+enum PlatformRole {
+  SUPER_ADMIN
+}
+
+enum AppointmentStatus {
+  CONFIRMED
+  COMPLETED
+  CANCELED
+  NO_SHOW
+}
+
+enum AppointmentType {
+  ONLINE
+  WALK_IN
+  BLOCKED
+}
+
+enum BlockReason {
+  BREAK
+  ABSENCE
+  EXTRAORDINARY
+  OTHER
+}
+
+enum TimeOffType {
+  VACATION
+  DAY_OFF
+  OTHER
+}
+
+enum WouldReturn {
+  YES
+  MAYBE
+  NO
+}
+
+enum FeedbackFollowUp {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+}
+
+enum NotificationEvent {
+  BOOKING_CONFIRMED
+  BOOKING_CANCELED
+  BOOKING_RESCHEDULED
+  REMINDER
+  FEEDBACK_INVITATION
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  DEV_LOGGED
+  SKIPPED_NO_PROVIDER
+  SKIPPED_NO_CONSENT
+  SKIPPED_NO_RECIPIENT
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum StoredFileKind {
+  BUSINESS_LOGO
+  BUSINESS_COVER
+  BUSINESS_GALLERY
+  STAFF_PHOTO
+  STAFF_PORTFOLIO
+  SERVICE_PHOTO
+}
+
+enum IncidentSeverity {
+  WARNING
+  ERROR
+}
+
+// ─────────────────────────── Plataforma / SaaS ───────────────────────────
+
+model Plan {
+  id                  String         @id @default(uuid()) @db.Uuid
+  code                String         @unique // STARTER | PRO | BUSINESS | ...
+  name                String
+  description         String?
+  monthlyPrice        Decimal        @db.Decimal(12, 2)
+  currency            String         @default("USD") @db.Char(3)
+  maxStaff            Int? // null = ilimitado
+  maxBranches         Int?
+  maxMonthlyBookings  Int? // null = ilimitado (uso razonable)
+  customBranding      Boolean        @default(false)
+  satisfactionReports Boolean        @default(false)
+  advancedReports     Boolean        @default(false)
+  isActive            Boolean        @default(true)
+  sortOrder           Int            @default(0)
+  createdAt           DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime       @updatedAt @db.Timestamptz(3)
+  subscriptions       Subscription[]
+}
+
+model Subscription {
+  id          String             @id @default(uuid()) @db.Uuid
+  businessId  String             @unique @db.Uuid
+  planId      String             @db.Uuid
+  status      SubscriptionStatus @default(TRIAL)
+  trialEndsAt DateTime?          @db.Timestamptz(3)
+  // Sin proveedor de cobro activo: estos campos se reservan para la integración futura.
+  externalRef String?
+  createdAt   DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime           @updatedAt @db.Timestamptz(3)
+  business    Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  plan        Plan               @relation(fields: [planId], references: [id])
+}
+
+model PlatformAdmin {
+  // Autorización de plataforma separada de las membresías del tenant:
+  // ningún endpoint de negocio puede crear o modificar este registro.
+  userId    String       @id @db.Uuid
+  role      PlatformRole @default(SUPER_ADMIN)
+  createdAt DateTime     @default(now()) @db.Timestamptz(3)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SupportAccessGrant {
+  id          String    @id @default(uuid()) @db.Uuid
+  businessId  String    @db.Uuid
+  grantedById String    @db.Uuid // OWNER que autoriza
+  reason      String
+  expiresAt   DateTime  @db.Timestamptz(3)
+  revokedAt   DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  grantedBy   User      @relation(fields: [grantedById], references: [id])
+
+  @@index([businessId, expiresAt])
+}
+
+model AuditLog {
+  id          String    @id @default(uuid()) @db.Uuid
+  actorUserId String?   @db.Uuid
+  businessId  String?   @db.Uuid
+  action      String
+  targetType  String?
+  targetId    String?
+  metadata    Json?
+  ip          String?
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  actor       User?     @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  business    Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+}
+
+model SystemIncident {
+  id          String           @id @default(uuid()) @db.Uuid
+  fingerprint String           @unique
+  severity    IncidentSeverity @default(ERROR)
+  source      String // http | notifications | jobs
+  message     String
+  context     Json?
+  occurrences Int              @default(1)
+  firstSeenAt DateTime         @default(now()) @db.Timestamptz(3)
+  lastSeenAt  DateTime         @default(now()) @db.Timestamptz(3)
+  resolvedAt  DateTime?        @db.Timestamptz(3)
+
+  @@index([lastSeenAt])
+}
+
+// ─────────────────────────── Identidad ───────────────────────────
+
+model User {
+  id              String               @id @default(uuid()) @db.Uuid
+  name            String
+  email           String               @unique // normalizado en minúsculas
+  passwordHash    String
+  status          UserStatus           @default(ACTIVE)
+  preferredLocale String?              @db.VarChar(10)
+  createdAt       DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime             @updatedAt @db.Timestamptz(3)
+  memberships     BusinessMembership[]
+  platformAdmin   PlatformAdmin?
+  refreshTokens   RefreshToken[]
+  auditLogs       AuditLog[]
+  supportGrants   SupportAccessGrant[]
+}
+
+model RefreshToken {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  familyId     String    @db.Uuid
+  tokenHash    String    @unique
+  expiresAt    DateTime  @db.Timestamptz(3)
+  revokedAt    DateTime? @db.Timestamptz(3)
+  replacedById String?   @db.Uuid
+  userAgent    String?
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+model BusinessMembership {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @db.Uuid
+  businessId String         @db.Uuid
+  role       MembershipRole
+  status     RecordStatus   @default(ACTIVE)
+  // Perfil profesional asociado (para usuarios STAFF que operan su propia agenda).
+  staffId    String?        @db.Uuid
+  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime       @updatedAt @db.Timestamptz(3)
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff      Staff?         @relation(fields: [staffId, businessId], references: [id, businessId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([userId, businessId])
+  @@unique([staffId, businessId])
+  @@index([businessId])
+}
+
+// ─────────────────────────── Tenant ───────────────────────────
+
+model Business {
+  id                  String         @id @default(uuid()) @db.Uuid
+  name                String
+  slug                String         @unique
+  type                BusinessType
+  description         String?
+  logoPath            String?
+  coverPath           String?
+  primaryColor        String         @default("#4F46E5") @db.Char(7)
+  country             String         @db.Char(2) // ISO 3166-1 alpha-2
+  currency            String         @db.Char(3) // ISO 4217
+  locale              String         @default("es") @db.VarChar(10)
+  timezone            String // IANA
+  status              BusinessStatus @default(ACTIVE)
+  // Reglas de reserva
+  slotIntervalMinutes Int            @default(15)
+  minLeadMinutes      Int            @default(60)
+  maxAdvanceDays      Int            @default(60)
+  cancelWindowMinutes Int            @default(120)
+  feedbackEnabled     Boolean        @default(true)
+  createdAt           DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime       @updatedAt @db.Timestamptz(3)
+
+  branches           Branch[]
+  memberships        BusinessMembership[]
+  staff              Staff[]
+  services           Service[]
+  staffServices      StaffService[]
+  workingHours       WorkingHours[]
+  recurringBreaks    RecurringBreak[]
+  scheduleExceptions ScheduleException[]
+  timeOff            StaffTimeOff[]
+  customers          Customer[]
+  appointments       Appointment[]
+  feedback           CustomerFeedback[]
+  notifications      Notification[]
+  files              StoredFile[]
+  portfolio          PortfolioItem[]
+  subscription       Subscription?
+  auditLogs          AuditLog[]
+  supportGrants      SupportAccessGrant[]
+}
+
+model Branch {
+  id           String        @id @default(uuid()) @db.Uuid
+  businessId   String        @db.Uuid
+  name         String
+  address      String?
+  timezone     String // IANA
+  status       RecordStatus  @default(ACTIVE)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff        Staff[]
+  appointments Appointment[]
+
+  @@unique([id, businessId])
+  @@index([businessId])
+}
+
+model Staff {
+  id                String              @id @default(uuid()) @db.Uuid
+  businessId        String              @db.Uuid
+  branchId          String              @db.Uuid
+  name              String
+  specialty         String?
+  bio               String?
+  photoPath         String?
+  commissionPercent Decimal?            @db.Decimal(5, 2)
+  active            Boolean             @default(true)
+  sortOrder         Int                 @default(0)
+  createdAt         DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime            @updatedAt @db.Timestamptz(3)
+  business          Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  branch            Branch              @relation(fields: [branchId, businessId], references: [id, businessId], onDelete: NoAction, onUpdate: NoAction)
+  services          StaffService[]
+  workingHours      WorkingHours[]
+  recurringBreaks   RecurringBreak[]
+  exceptions        ScheduleException[]
+  timeOff           StaffTimeOff[]
+  appointments      Appointment[]
+  feedback          CustomerFeedback[]
+  portfolio         PortfolioItem[]
+  membership        BusinessMembership?
+
+  @@unique([id, businessId])
+  @@index([businessId, active])
+}
+
+model Service {
+  id              String             @id @default(uuid()) @db.Uuid
+  businessId      String             @db.Uuid
+  name            String
+  description     String?
+  category        String?
+  // Importe en la moneda del negocio (Business.currency).
+  price           Decimal            @db.Decimal(12, 2)
+  durationMinutes Int
+  photoPath       String?
+  active          Boolean            @default(true)
+  sortOrder       Int                @default(0)
+  createdAt       DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime           @updatedAt @db.Timestamptz(3)
+  business        Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff           StaffService[]
+  appointments    Appointment[]
+  feedback        CustomerFeedback[]
+
+  @@unique([id, businessId])
+  @@index([businessId, active])
+}
+
+model StaffService {
+  businessId String   @db.Uuid
+  staffId    String   @db.Uuid
+  serviceId  String   @db.Uuid
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff      Staff    @relation(fields: [staffId, businessId], references: [id, businessId], onDelete: Cascade, onUpdate: NoAction)
+  service    Service  @relation(fields: [serviceId, businessId], references: [id, businessId], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([staffId, serviceId])
+  @@index([businessId, serviceId])
+}
+
+// Horario semanal: varios tramos por día permiten jornadas partidas.
+model WorkingHours {
+  id          String   @id @default(uuid()) @db.Uuid
+  businessId  String   @db.Uuid
+  staffId     String   @db.Uuid
+  weekday     Int // ISO: 1 = lunes … 7 = domingo
+  startMinute Int // minutos locales desde medianoche
+  endMinute   Int
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff       Staff    @relation(fields: [staffId, businessId], references: [id, businessId], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([staffId, weekday])
+}
+
+model RecurringBreak {
+  id          String   @id @default(uuid()) @db.Uuid
+  businessId  String   @db.Uuid
+  staffId     String   @db.Uuid
+  weekday     Int
+  startMinute Int
+  endMinute   Int
+  label       String?
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff       Staff    @relation(fields: [staffId, businessId], references: [id, businessId], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([staffId, weekday])
+}
+
+// Excepción para una fecha local concreta: reemplaza el horario semanal de ese día.
+model ScheduleException {
+  id          String   @id @default(uuid()) @db.Uuid
+  businessId  String   @db.Uuid
+  staffId     String   @db.Uuid
+  date        DateTime @db.Date
+  isClosed    Boolean  @default(false)
+  startMinute Int?
+  endMinute   Int?
+  note        String?
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff       Staff    @relation(fields: [staffId, businessId], references: [id, businessId], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([staffId, date])
+}
+
+// Vacaciones, días libres y ausencias largas (instantes UTC).
+model StaffTimeOff {
+  id         String      @id @default(uuid()) @db.Uuid
+  businessId String      @db.Uuid
+  staffId    String      @db.Uuid
+  type       TimeOffType
+  startsAt   DateTime    @db.Timestamptz(3)
+  endsAt     DateTime    @db.Timestamptz(3)
+  note       String?
+  createdAt  DateTime    @default(now()) @db.Timestamptz(3)
+  business   Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff      Staff       @relation(fields: [staffId, businessId], references: [id, businessId], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([staffId, startsAt])
+}
+
+model PortfolioItem {
+  id         String   @id @default(uuid()) @db.Uuid
+  businessId String   @db.Uuid
+  staffId    String?  @db.Uuid
+  path       String
+  caption    String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  staff      Staff?   @relation(fields: [staffId, businessId], references: [id, businessId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([businessId])
+  @@index([staffId])
+}
+
+model StoredFile {
+  id           String         @id @default(uuid()) @db.Uuid
+  businessId   String         @db.Uuid
+  kind         StoredFileKind
+  bucket       String
+  path         String         @unique
+  mimeType     String
+  sizeBytes    Int
+  width        Int?
+  height       Int?
+  uploadedById String?        @db.Uuid
+  createdAt    DateTime       @default(now()) @db.Timestamptz(3)
+  business     Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+}
+
+// ─────────────────────────── Reservas ───────────────────────────
+
+model Customer {
+  id              String        @id @default(uuid()) @db.Uuid
+  businessId      String        @db.Uuid
+  name            String
+  phoneE164       String
+  whatsappConsent Boolean       @default(false)
+  consentAt       DateTime?     @db.Timestamptz(3)
+  createdAt       DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @db.Timestamptz(3)
+  business        Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  appointments    Appointment[]
+
+  @@unique([businessId, phoneE164])
+  @@unique([id, businessId])
+}
+
+model Appointment {
+  id                   String            @id @default(uuid()) @db.Uuid
+  businessId           String            @db.Uuid
+  branchId             String            @db.Uuid
+  staffId              String            @db.Uuid
+  serviceId            String?           @db.Uuid
+  customerId           String?           @db.Uuid
+  type                 AppointmentType
+  status               AppointmentStatus @default(CONFIRMED)
+  startsAt             DateTime          @db.Timestamptz(3)
+  endsAt               DateTime          @db.Timestamptz(3)
+  // Datos congelados al reservar (el servicio puede cambiar de precio después).
+  priceSnapshot        Decimal?          @db.Decimal(12, 2)
+  currency             String?           @db.Char(3)
+  walkInName           String?
+  blockReason          BlockReason?
+  notes                String?
+  manageTokenHash      String?           @unique
+  manageTokenExpiresAt DateTime?         @db.Timestamptz(3)
+  rescheduleCount      Int               @default(0)
+  canceledAt           DateTime?         @db.Timestamptz(3)
+  cancelReason         String?
+  canceledBy           String? // CUSTOMER | STAFF
+  completedAt          DateTime?         @db.Timestamptz(3)
+  createdById          String?           @db.Uuid
+  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
+  business             Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  branch               Branch            @relation(fields: [branchId, businessId], references: [id, businessId], onDelete: NoAction, onUpdate: NoAction)
+  staff                Staff             @relation(fields: [staffId, businessId], references: [id, businessId], onDelete: NoAction, onUpdate: NoAction)
+  service              Service?          @relation(fields: [serviceId, businessId], references: [id, businessId], onDelete: NoAction, onUpdate: NoAction)
+  customer             Customer?         @relation(fields: [customerId, businessId], references: [id, businessId], onDelete: NoAction, onUpdate: NoAction)
+  feedback             CustomerFeedback?
+  notifications        Notification[]
+
+  @@unique([id, businessId])
+  @@index([businessId, startsAt])
+  @@index([staffId, startsAt])
+  @@index([customerId])
+}
+
+// ─────────────────────────── Satisfacción ───────────────────────────
+
+model CustomerFeedback {
+  id             String           @id @default(uuid()) @db.Uuid
+  businessId     String           @db.Uuid
+  appointmentId  String           @unique @db.Uuid
+  staffId        String           @db.Uuid
+  serviceId      String?          @db.Uuid
+  tokenHash      String           @unique
+  expiresAt      DateTime         @db.Timestamptz(3)
+  rating         Int?
+  wouldReturn    WouldReturn?
+  comment        String?
+  respondedAt    DateTime?        @db.Timestamptz(3)
+  followUpStatus FeedbackFollowUp @default(PENDING)
+  followUpNote   String?
+  createdAt      DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @db.Timestamptz(3)
+  business       Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  appointment    Appointment      @relation(fields: [appointmentId, businessId], references: [id, businessId], onDelete: Cascade, onUpdate: NoAction)
+  staff          Staff            @relation(fields: [staffId, businessId], references: [id, businessId], onDelete: NoAction, onUpdate: NoAction)
+  service        Service?         @relation(fields: [serviceId, businessId], references: [id, businessId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([appointmentId, businessId])
+  @@index([businessId, respondedAt])
+  @@index([staffId])
+  @@index([serviceId])
+}
+
+// ─────────────────────────── Notificaciones ───────────────────────────
+
+model Notification {
+  id                String              @id @default(uuid()) @db.Uuid
+  businessId        String              @db.Uuid
+  appointmentId     String?             @db.Uuid
+  channel           NotificationChannel
+  event             NotificationEvent
+  recipient         String?
+  locale            String              @default("es") @db.VarChar(10)
+  payload           Json
+  idempotencyKey    String              @unique
+  status            NotificationStatus  @default(PENDING)
+  provider          String?
+  providerMessageId String?
+  attempts          Int                 @default(0)
+  nextAttemptAt     DateTime            @default(now()) @db.Timestamptz(3)
+  lastError         String?
+  sentAt            DateTime?           @db.Timestamptz(3)
+  createdAt         DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime            @updatedAt @db.Timestamptz(3)
+  business          Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  appointment       Appointment?        @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([status, nextAttemptAt])
+  @@index([businessId, createdAt])
+}
