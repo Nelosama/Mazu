@@ -39,4 +39,4 @@ Las pruebas de integración y E2E vacían su base de datos y se niegan a correr 
 - E2E: **15/15** (2 proyectos)
 - `lint`, `typecheck`, `format:check`: sin errores
 
-En CI (`.github/workflows/ci.yml`) estas mismas suites corren con un servicio `postgres:16`. El workflow todavía no se ha ejecutado en GitHub; los resultados de arriba son locales.
+En CI (`.github/workflows/ci.yml`) estas mismas suites corren con un servicio `postgres:16`. La ejecución [#2](https://github.com/Nelosama/Mazu/actions/runs/38876834396) pasó en verde sus 4 jobs: calidad, backend, frontend y E2E.
