@@ -37,7 +37,11 @@ export class UpdateStaffDto {
   @IsOptional() @Transform(trim) @IsString() @MinLength(2) @MaxLength(80) name?: string;
   @IsOptional() @Transform(trim) @IsString() @MaxLength(80) specialty?: string;
   @IsOptional() @Transform(trim) @IsString() @MaxLength(1000) bio?: string;
-  @IsOptional() @ValidateIf((_, v) => v !== null) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(100)
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
   commissionPercent?: number | null;
   @IsOptional() @IsBoolean() active?: boolean;
   @IsOptional() @IsInt() @Min(0) @Max(10000) sortOrder?: number;
@@ -53,9 +57,15 @@ export class TimeRangeDto {
 }
 
 export class WeeklyScheduleDto {
-  @IsArray() @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => TimeRangeDto)
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => TimeRangeDto)
   workingHours: TimeRangeDto[];
-  @IsArray() @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => TimeRangeDto)
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => TimeRangeDto)
   breaks: TimeRangeDto[];
 }
 

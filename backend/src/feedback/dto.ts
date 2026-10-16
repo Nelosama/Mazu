@@ -1,6 +1,17 @@
 import { FeedbackFollowUp, WouldReturn } from '@prisma/client';
 import { Transform } from 'class-transformer';
-import { IsDateString, IsEnum, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class SubmitFeedbackDto {
   @IsInt() @Min(1) @Max(5) rating: number;
@@ -21,7 +32,8 @@ export class FeedbackQueryDto {
 
 export class FeedbackListQueryDto extends FeedbackQueryDto {
   @IsOptional() @IsEnum(FeedbackFollowUp) followUpStatus?: FeedbackFollowUp;
-  @IsOptional() @IsIn(['all', 'negative', 'with_comment']) filter?: 'all' | 'negative' | 'with_comment';
+  @IsOptional() @IsIn(['all', 'negative', 'with_comment']) filter?:
+    'all' | 'negative' | 'with_comment';
   @IsOptional() @Transform(({ value }) => Number(value)) @IsInt() @Min(1) @Max(100) limit?: number;
 }
 

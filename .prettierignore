@@ -6,3 +6,6 @@ test-results
 prisma/migrations
 *.md
 package-lock.json
+.local-storage*
+e2e/test-results
+**/*.json

@@ -47,7 +47,11 @@ export class AvailabilityService {
    * Calcula los horarios disponibles por día. La respuesta no contiene ningún dato
    * de otras reservas: solo inicios libres y qué profesionales pueden atenderlos.
    */
-  async slots(business: BusinessRules, q: AvailabilityQuery, tx?: Tx): Promise<Map<string, SlotResult[]>> {
+  async slots(
+    business: BusinessRules,
+    q: AvailabilityQuery,
+    tx?: Tx,
+  ): Promise<Map<string, SlotResult[]>> {
     const db = tx ?? this.prisma;
     const days = dateRange(q.from, q.to);
     if (days.length === 0 || days.length > MAX_RANGE_DAYS) throw badRequest('INVALID_DATE_RANGE');
@@ -65,7 +69,11 @@ export class AvailabilityService {
         services: { some: { serviceId: service.id } },
         ...(q.staffId ? { id: q.staffId } : {}),
       },
-      include: { branch: { select: { timezone: true } }, workingHours: true, recurringBreaks: true },
+      include: {
+        branch: { select: { timezone: true } },
+        workingHours: true,
+        recurringBreaks: true,
+      },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
     if (q.staffId && staffList.length === 0) throw notFound('STAFF_NOT_FOUND');
@@ -76,7 +84,9 @@ export class AvailabilityService {
 
     // Ventana UTC amplia que cubre todas las zonas posibles del rango.
     const windowStart = new Date(dayWindow(days[0], business.timezone).start - 36 * 3_600_000);
-    const windowEnd = new Date(dayWindow(days[days.length - 1], business.timezone).end + 36 * 3_600_000);
+    const windowEnd = new Date(
+      dayWindow(days[days.length - 1], business.timezone).end + 36 * 3_600_000,
+    );
     const staffIds = staffList.map((s) => s.id);
 
     const [appointments, timeOff, exceptions] = await Promise.all([
@@ -92,7 +102,12 @@ export class AvailabilityService {
         select: { staffId: true, startsAt: true, endsAt: true },
       }),
       db.staffTimeOff.findMany({
-        where: { businessId: business.id, staffId: { in: staffIds }, startsAt: { lt: windowEnd }, endsAt: { gt: windowStart } },
+        where: {
+          businessId: business.id,
+          staffId: { in: staffIds },
+          startsAt: { lt: windowEnd },
+          endsAt: { gt: windowStart },
+        },
         select: { staffId: true, startsAt: true, endsAt: true },
       }),
       db.scheduleException.findMany({
@@ -101,7 +116,11 @@ export class AvailabilityService {
           staffId: { in: staffIds },
           date: {
             gte: new Date(`${DateTime.fromISO(days[0]).minus({ days: 1 }).toISODate()}T00:00:00Z`),
-            lte: new Date(`${DateTime.fromISO(days[days.length - 1]).plus({ days: 1 }).toISODate()}T00:00:00Z`),
+            lte: new Date(
+              `${DateTime.fromISO(days[days.length - 1])
+                .plus({ days: 1 })
+                .toISODate()}T00:00:00Z`,
+            ),
           },
         },
       }),
@@ -158,7 +177,13 @@ export class AvailabilityService {
   /** Comprueba que un inicio concreto está disponible para un profesional. */
   async isStartAvailable(
     business: BusinessRules,
-    params: { serviceId: string; staffId: string; startsAt: Date; excludeAppointmentId?: string; ignoreLeadTime?: boolean },
+    params: {
+      serviceId: string;
+      staffId: string;
+      startsAt: Date;
+      excludeAppointmentId?: string;
+      ignoreLeadTime?: boolean;
+    },
     tx?: Tx,
   ): Promise<boolean> {
     const staff = await (tx ?? this.prisma).staff.findFirst({

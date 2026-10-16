@@ -13,8 +13,7 @@ export interface OutgoingMessage {
 }
 
 export type SendResult =
-  | { ok: true; providerMessageId?: string }
-  | { ok: false; retryable: boolean; error: string };
+  { ok: true; providerMessageId?: string } | { ok: false; retryable: boolean; error: string };
 
 export interface NotificationProvider {
   readonly name: string;

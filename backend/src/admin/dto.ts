@@ -22,7 +22,9 @@ const MONEY = /^\d{1,10}(\.\d{1,2})?$/;
 
 export class AdminOwnerDto {
   @IsString() @MinLength(2) @MaxLength(80) name: string;
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value)) @IsEmail() email: string;
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsEmail()
+  email: string;
   @IsOptional() @IsString() @MinLength(10) @MaxLength(128) password?: string;
 }
 
@@ -46,11 +48,24 @@ export class PlanDto {
   @IsOptional() @IsString() @Matches(/^[A-Z0-9_]{2,30}$/) code?: string;
   @IsOptional() @IsString() @MaxLength(60) name?: string;
   @IsOptional() @IsString() @MaxLength(300) description?: string;
-  @IsOptional() @Transform(({ value }) => (typeof value === 'number' ? String(value) : value)) @Matches(MONEY) monthlyPrice?: string;
-  @IsOptional() @Transform(({ value }) => (typeof value === 'string' ? value.toUpperCase() : value)) @IsCurrencyCode() currency?: string;
-  @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() @Min(1) @Max(10000) maxStaff?: number | null;
-  @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() @Min(1) @Max(1000) maxBranches?: number | null;
-  @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() @Min(0) @Max(1_000_000) maxMonthlyBookings?: number | null;
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'number' ? String(value) : value))
+  @Matches(MONEY)
+  monthlyPrice?: string;
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.toUpperCase() : value))
+  @IsCurrencyCode()
+  currency?: string;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() @Min(1) @Max(10000) maxStaff?:
+    number | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() @Min(1) @Max(1000) maxBranches?:
+    number | null;
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsInt()
+  @Min(0)
+  @Max(1_000_000)
+  maxMonthlyBookings?: number | null;
   @IsOptional() @IsBoolean() customBranding?: boolean;
   @IsOptional() @IsBoolean() satisfactionReports?: boolean;
   @IsOptional() @IsBoolean() advancedReports?: boolean;

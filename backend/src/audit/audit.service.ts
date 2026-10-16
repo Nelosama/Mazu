@@ -25,7 +25,9 @@ export class AuditService {
       await client.auditLog.create({ data: { ...entry } });
     } catch (err) {
       if (tx) throw err;
-      this.logger.error(`No se pudo registrar auditoría ${entry.action}: ${(err as Error).message}`);
+      this.logger.error(
+        `No se pudo registrar auditoría ${entry.action}: ${(err as Error).message}`,
+      );
     }
   }
 }

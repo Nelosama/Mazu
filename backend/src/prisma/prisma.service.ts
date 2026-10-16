@@ -20,7 +20,11 @@ export const EXCLUSION_VIOLATION = '23P01';
 export function isExclusionViolation(err: unknown): boolean {
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     const meta = JSON.stringify(err.meta ?? {});
-    return meta.includes(EXCLUSION_VIOLATION) || meta.includes('no_overlap') || err.message.includes('23P01');
+    return (
+      meta.includes(EXCLUSION_VIOLATION) ||
+      meta.includes('no_overlap') ||
+      err.message.includes('23P01')
+    );
   }
   if (err instanceof Prisma.PrismaClientUnknownRequestError) {
     return err.message.includes('23P01') || err.message.includes('Appointment_no_overlap_excl');

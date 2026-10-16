@@ -46,7 +46,8 @@ export class MediaService {
 
     // STAFF solo puede gestionar su propia foto y portafolio.
     if (tenant.role === 'STAFF') {
-      const ownStaff = (kind === 'staff-photo' || kind === 'portfolio') && targetId && targetId === tenant.staffId;
+      const ownStaff =
+        (kind === 'staff-photo' || kind === 'portfolio') && targetId && targetId === tenant.staffId;
       if (!ownStaff) throw forbidden('INSUFFICIENT_ROLE');
     }
 
@@ -91,10 +92,14 @@ export class MediaService {
             uploadedById: actorUserId,
           },
         });
-        if (kind === 'logo') await tx.business.update({ where: { id: businessId }, data: { logoPath: path } });
-        if (kind === 'cover') await tx.business.update({ where: { id: businessId }, data: { coverPath: path } });
-        if (kind === 'staff-photo') await tx.staff.update({ where: { id: targetId }, data: { photoPath: path } });
-        if (kind === 'service-photo') await tx.service.update({ where: { id: targetId }, data: { photoPath: path } });
+        if (kind === 'logo')
+          await tx.business.update({ where: { id: businessId }, data: { logoPath: path } });
+        if (kind === 'cover')
+          await tx.business.update({ where: { id: businessId }, data: { coverPath: path } });
+        if (kind === 'staff-photo')
+          await tx.staff.update({ where: { id: targetId }, data: { photoPath: path } });
+        if (kind === 'service-photo')
+          await tx.service.update({ where: { id: targetId }, data: { photoPath: path } });
         if (kind === 'portfolio') {
           return tx.portfolioItem.create({
             data: { businessId, staffId: targetId ?? null, path, caption: caption?.slice(0, 200) },
@@ -103,7 +108,13 @@ export class MediaService {
         return null;
       });
       if (previousPath) await this.deleteStored(businessId, previousPath);
-      await this.audit.log({ actorUserId, businessId, action: 'media.upload', targetType: kind, targetId: targetId ?? businessId });
+      await this.audit.log({
+        actorUserId,
+        businessId,
+        action: 'media.upload',
+        targetType: kind,
+        targetId: targetId ?? businessId,
+      });
       return {
         path,
         url: publicFileUrl(path),
@@ -119,12 +130,21 @@ export class MediaService {
   }
 
   async deletePortfolioItem(tenant: TenantContext, actorUserId: string, itemId: string) {
-    const item = await this.prisma.portfolioItem.findFirst({ where: { id: itemId, businessId: tenant.businessId } });
+    const item = await this.prisma.portfolioItem.findFirst({
+      where: { id: itemId, businessId: tenant.businessId },
+    });
     if (!item) throw notFound('PORTFOLIO_ITEM_NOT_FOUND');
-    if (tenant.role === 'STAFF' && item.staffId !== tenant.staffId) throw forbidden('INSUFFICIENT_ROLE');
+    if (tenant.role === 'STAFF' && item.staffId !== tenant.staffId)
+      throw forbidden('INSUFFICIENT_ROLE');
     await this.prisma.portfolioItem.delete({ where: { id: item.id } });
     await this.deleteStored(tenant.businessId, item.path);
-    await this.audit.log({ actorUserId, businessId: tenant.businessId, action: 'media.delete', targetType: 'portfolio', targetId: itemId });
+    await this.audit.log({
+      actorUserId,
+      businessId: tenant.businessId,
+      action: 'media.delete',
+      targetType: 'portfolio',
+      targetId: itemId,
+    });
   }
 
   async listPortfolio(businessId: string) {
@@ -136,7 +156,11 @@ export class MediaService {
   }
 
   async usage(businessId: string) {
-    const agg = await this.prisma.storedFile.aggregate({ where: { businessId }, _sum: { sizeBytes: true }, _count: true });
+    const agg = await this.prisma.storedFile.aggregate({
+      where: { businessId },
+      _sum: { sizeBytes: true },
+      _count: true,
+    });
     return { files: agg._count, bytes: agg._sum.sizeBytes ?? 0 };
   }
 

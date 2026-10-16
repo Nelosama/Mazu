@@ -29,7 +29,9 @@ export async function resetDatabase(prisma: PrismaService) {
     SELECT tablename FROM pg_tables
     WHERE schemaname = 'public' AND tablename NOT IN ('_prisma_migrations', 'Plan')`;
   if (!tables.length) return;
-  await prisma.$executeRawUnsafe(`TRUNCATE ${tables.map((t) => `"${t.tablename}"`).join(', ')} CASCADE`);
+  await prisma.$executeRawUnsafe(
+    `TRUNCATE ${tables.map((t) => `"${t.tablename}"`).join(', ')} CASCADE`,
+  );
 }
 
 let seq = 0;
@@ -45,7 +47,13 @@ export interface Owner {
 
 export async function registerOwner(
   ctx: TestContext,
-  overrides: { timezone?: string; country?: string; currency?: string; locale?: string; name?: string } = {},
+  overrides: {
+    timezone?: string;
+    country?: string;
+    currency?: string;
+    locale?: string;
+    name?: string;
+  } = {},
 ): Promise<Owner> {
   const email = `${uniq('owner')}@test.dev`;
   const res = await ctx
@@ -66,13 +74,23 @@ export async function registerOwner(
     })
     .expect(201);
   const b = await ctx.prisma.business.findUniqueOrThrow({ where: { id: res.body.businessId } });
-  return { token: res.body.accessToken, businessId: res.body.businessId, userId: res.body.user.id, email, slug: b.slug };
+  return {
+    token: res.body.accessToken,
+    businessId: res.body.businessId,
+    userId: res.body.user.id,
+    email,
+    slug: b.slug,
+  };
 }
 
 export const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 /** Crea un profesional con horario 09:00–18:00 todos los días y un servicio de 30 min. */
-export async function setupCatalog(ctx: TestContext, owner: Owner, opts: { duration?: number; staffCount?: number } = {}) {
+export async function setupCatalog(
+  ctx: TestContext,
+  owner: Owner,
+  opts: { duration?: number; staffCount?: number } = {},
+) {
   const service = await ctx
     .http()
     .post(`/api/businesses/${owner.businessId}/services`)
@@ -92,7 +110,11 @@ export async function setupCatalog(ctx: TestContext, owner: Owner, opts: { durat
       .put(`/api/businesses/${owner.businessId}/staff/${s.body.id}/schedule`)
       .set(auth(owner.token))
       .send({
-        workingHours: [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({ weekday, startMinute: 540, endMinute: 1080 })),
+        workingHours: [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({
+          weekday,
+          startMinute: 540,
+          endMinute: 1080,
+        })),
         breaks: [],
       })
       .expect(200);
@@ -108,10 +130,17 @@ export function futureDate(days: number, timezone: string) {
 
 export function localInstant(date: string, hhmm: string, timezone: string) {
   const [h, m] = hhmm.split(':').map(Number);
-  return DateTime.fromISO(date, { zone: timezone }).set({ hour: h, minute: m, second: 0, millisecond: 0 }).toUTC().toISO()!;
+  return DateTime.fromISO(date, { zone: timezone })
+    .set({ hour: h, minute: m, second: 0, millisecond: 0 })
+    .toUTC()
+    .toISO()!;
 }
 
-export function bookingPayload(serviceId: string, startsAt: string, extra: Record<string, unknown> = {}) {
+export function bookingPayload(
+  serviceId: string,
+  startsAt: string,
+  extra: Record<string, unknown> = {},
+) {
   return {
     serviceId,
     startsAt,

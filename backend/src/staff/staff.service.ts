@@ -7,7 +7,14 @@ import { AuditService } from '../audit/audit.service';
 import { PlansService } from '../subscriptions/plans.service';
 import type { TenantContext } from '../common/request-context';
 import { publicFileUrl } from '../storage/public-url';
-import { CreateExceptionDto, CreateStaffDto, CreateTimeOffDto, TimeRangeDto, UpdateStaffDto, WeeklyScheduleDto } from './dto';
+import {
+  CreateExceptionDto,
+  CreateStaffDto,
+  CreateTimeOffDto,
+  TimeRangeDto,
+  UpdateStaffDto,
+  WeeklyScheduleDto,
+} from './dto';
 
 export function serializeStaff(s: Staff & { services?: { serviceId: string }[] }) {
   return {
@@ -34,7 +41,8 @@ export function assertNoOverlap(ranges: TimeRangeDto[], code: string) {
   for (const list of byDay.values()) {
     const sorted = [...list].sort((a, b) => a.startMinute - b.startMinute);
     for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i].startMinute < sorted[i - 1].endMinute) throw badRequest(code, 'Tramos solapados');
+      if (sorted[i].startMinute < sorted[i - 1].endMinute)
+        throw badRequest(code, 'Tramos solapados');
     }
   }
 }
@@ -77,10 +85,12 @@ export class StaffService {
           name: dto.name,
           specialty: dto.specialty,
           bio: dto.bio,
-          commissionPercent: dto.commissionPercent !== undefined ? new Prisma.Decimal(dto.commissionPercent) : null,
+          commissionPercent:
+            dto.commissionPercent !== undefined ? new Prisma.Decimal(dto.commissionPercent) : null,
         },
       });
-      if (dto.serviceIds?.length) await this.assignServices(tx, businessId, created.id, dto.serviceIds);
+      if (dto.serviceIds?.length)
+        await this.assignServices(tx, businessId, created.id, dto.serviceIds);
       if (dto.withDefaultSchedule) {
         await tx.workingHours.createMany({
           data: [1, 2, 3, 4, 5, 6].map((weekday) => ({
@@ -92,9 +102,18 @@ export class StaffService {
           })),
         });
       }
-      return tx.staff.findUniqueOrThrow({ where: { id: created.id }, include: { services: { select: { serviceId: true } } } });
+      return tx.staff.findUniqueOrThrow({
+        where: { id: created.id },
+        include: { services: { select: { serviceId: true } } },
+      });
     });
-    await this.audit.log({ actorUserId, businessId, action: 'staff.create', targetType: 'Staff', targetId: staff.id });
+    await this.audit.log({
+      actorUserId,
+      businessId,
+      action: 'staff.create',
+      targetType: 'Staff',
+      targetId: staff.id,
+    });
     return serializeStaff(staff);
   }
 
@@ -104,14 +123,18 @@ export class StaffService {
     if (!existing) throw notFound('STAFF_NOT_FOUND');
     const { serviceIds, commissionPercent, branchId, ...data } = dto;
     const staff = await this.prisma.$transaction(async (tx) => {
-      if (dto.active === true && !existing.active) await this.plans.assertCanAddStaff(businessId, tx);
+      if (dto.active === true && !existing.active)
+        await this.plans.assertCanAddStaff(businessId, tx);
       await tx.staff.update({
         where: { id },
         data: {
           ...data,
           ...(branchId ? { branchId: await this.resolveBranch(tx, businessId, branchId) } : {}),
           ...(commissionPercent !== undefined
-            ? { commissionPercent: commissionPercent === null ? null : new Prisma.Decimal(commissionPercent) }
+            ? {
+                commissionPercent:
+                  commissionPercent === null ? null : new Prisma.Decimal(commissionPercent),
+              }
             : {}),
         },
       });
@@ -119,18 +142,30 @@ export class StaffService {
         await tx.staffService.deleteMany({ where: { businessId, staffId: id } });
         await this.assignServices(tx, businessId, id, serviceIds);
       }
-      return tx.staff.findUniqueOrThrow({ where: { id }, include: { services: { select: { serviceId: true } } } });
+      return tx.staff.findUniqueOrThrow({
+        where: { id },
+        include: { services: { select: { serviceId: true } } },
+      });
     });
-    await this.audit.log({ actorUserId, businessId, action: 'staff.update', targetType: 'Staff', targetId: id });
+    await this.audit.log({
+      actorUserId,
+      businessId,
+      action: 'staff.update',
+      targetType: 'Staff',
+      targetId: id,
+    });
     return serializeStaff(staff);
   }
 
   // ───────────── Horarios ─────────────
 
   private async assertStaffAccess(tenant: TenantContext, staffId: string, write: boolean) {
-    const s = await this.prisma.staff.findFirst({ where: { id: staffId, businessId: tenant.businessId } });
+    const s = await this.prisma.staff.findFirst({
+      where: { id: staffId, businessId: tenant.businessId },
+    });
     if (!s) throw notFound('STAFF_NOT_FOUND');
-    if (write && tenant.role === 'STAFF' && tenant.staffId !== staffId) throw forbidden('INSUFFICIENT_ROLE');
+    if (write && tenant.role === 'STAFF' && tenant.staffId !== staffId)
+      throw forbidden('INSUFFICIENT_ROLE');
     return s;
   }
 
@@ -138,23 +173,52 @@ export class StaffService {
     await this.assertStaffAccess(tenant, staffId, false);
     const now = new Date();
     const [workingHours, breaks, exceptions, timeOff] = await Promise.all([
-      this.prisma.workingHours.findMany({ where: { staffId }, orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }] }),
-      this.prisma.recurringBreak.findMany({ where: { staffId }, orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }] }),
+      this.prisma.workingHours.findMany({
+        where: { staffId },
+        orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }],
+      }),
+      this.prisma.recurringBreak.findMany({
+        where: { staffId },
+        orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }],
+      }),
       this.prisma.scheduleException.findMany({
-        where: { staffId, date: { gte: DateTime.utc().minus({ days: 1 }).startOf('day').toJSDate() } },
+        where: {
+          staffId,
+          date: { gte: DateTime.utc().minus({ days: 1 }).startOf('day').toJSDate() },
+        },
         orderBy: { date: 'asc' },
       }),
-      this.prisma.staffTimeOff.findMany({ where: { staffId, endsAt: { gte: now } }, orderBy: { startsAt: 'asc' } }),
+      this.prisma.staffTimeOff.findMany({
+        where: { staffId, endsAt: { gte: now } },
+        orderBy: { startsAt: 'asc' },
+      }),
     ]);
     return {
-      workingHours: workingHours.map(({ weekday, startMinute, endMinute }) => ({ weekday, startMinute, endMinute })),
-      breaks: breaks.map(({ weekday, startMinute, endMinute, label }) => ({ weekday, startMinute, endMinute, label })),
-      exceptions: exceptions.map((e) => ({ ...e, date: DateTime.fromJSDate(e.date, { zone: 'utc' }).toISODate() })),
+      workingHours: workingHours.map(({ weekday, startMinute, endMinute }) => ({
+        weekday,
+        startMinute,
+        endMinute,
+      })),
+      breaks: breaks.map(({ weekday, startMinute, endMinute, label }) => ({
+        weekday,
+        startMinute,
+        endMinute,
+        label,
+      })),
+      exceptions: exceptions.map((e) => ({
+        ...e,
+        date: DateTime.fromJSDate(e.date, { zone: 'utc' }).toISODate(),
+      })),
       timeOff,
     };
   }
 
-  async replaceWeeklySchedule(tenant: TenantContext, actorUserId: string, staffId: string, dto: WeeklyScheduleDto) {
+  async replaceWeeklySchedule(
+    tenant: TenantContext,
+    actorUserId: string,
+    staffId: string,
+    dto: WeeklyScheduleDto,
+  ) {
     await this.assertStaffAccess(tenant, staffId, true);
     assertNoOverlap(dto.workingHours, 'INVALID_WORKING_HOURS');
     assertNoOverlap(dto.breaks, 'INVALID_BREAKS');
@@ -163,19 +227,43 @@ export class StaffService {
       this.prisma.workingHours.deleteMany({ where: { staffId, businessId } }),
       this.prisma.recurringBreak.deleteMany({ where: { staffId, businessId } }),
       this.prisma.workingHours.createMany({
-        data: dto.workingHours.map((r) => ({ businessId, staffId, weekday: r.weekday, startMinute: r.startMinute, endMinute: r.endMinute })),
+        data: dto.workingHours.map((r) => ({
+          businessId,
+          staffId,
+          weekday: r.weekday,
+          startMinute: r.startMinute,
+          endMinute: r.endMinute,
+        })),
       }),
       this.prisma.recurringBreak.createMany({
-        data: dto.breaks.map((r) => ({ businessId, staffId, weekday: r.weekday, startMinute: r.startMinute, endMinute: r.endMinute, label: r.label })),
+        data: dto.breaks.map((r) => ({
+          businessId,
+          staffId,
+          weekday: r.weekday,
+          startMinute: r.startMinute,
+          endMinute: r.endMinute,
+          label: r.label,
+        })),
       }),
     ]);
-    await this.audit.log({ actorUserId, businessId, action: 'staff.schedule_update', targetType: 'Staff', targetId: staffId });
+    await this.audit.log({
+      actorUserId,
+      businessId,
+      action: 'staff.schedule_update',
+      targetType: 'Staff',
+      targetId: staffId,
+    });
     return this.getSchedule(tenant, staffId);
   }
 
-  async addException(tenant: TenantContext, actorUserId: string, staffId: string, dto: CreateExceptionDto) {
+  async addException(
+    tenant: TenantContext,
+    actorUserId: string,
+    staffId: string,
+    dto: CreateExceptionDto,
+  ) {
     await this.assertStaffAccess(tenant, staffId, true);
-    if (!dto.isClosed && (dto.endMinute! <= dto.startMinute!)) throw badRequest('INVALID_EXCEPTION');
+    if (!dto.isClosed && dto.endMinute! <= dto.startMinute!) throw badRequest('INVALID_EXCEPTION');
     const ex = await this.prisma.scheduleException.create({
       data: {
         businessId: tenant.businessId,
@@ -187,24 +275,39 @@ export class StaffService {
         note: dto.note,
       },
     });
-    await this.audit.log({ actorUserId, businessId: tenant.businessId, action: 'staff.exception_add', targetType: 'Staff', targetId: staffId });
+    await this.audit.log({
+      actorUserId,
+      businessId: tenant.businessId,
+      action: 'staff.exception_add',
+      targetType: 'Staff',
+      targetId: staffId,
+    });
     return { ...ex, date: dto.date };
   }
 
   async removeException(tenant: TenantContext, staffId: string, id: string) {
     await this.assertStaffAccess(tenant, staffId, true);
-    const res = await this.prisma.scheduleException.deleteMany({ where: { id, staffId, businessId: tenant.businessId } });
+    const res = await this.prisma.scheduleException.deleteMany({
+      where: { id, staffId, businessId: tenant.businessId },
+    });
     if (!res.count) throw notFound('EXCEPTION_NOT_FOUND');
   }
 
-  async addTimeOff(tenant: TenantContext, actorUserId: string, staffId: string, dto: CreateTimeOffDto) {
+  async addTimeOff(
+    tenant: TenantContext,
+    actorUserId: string,
+    staffId: string,
+    dto: CreateTimeOffDto,
+  ) {
     const staff = await this.assertStaffAccess(tenant, staffId, true);
     const branch = await this.prisma.branch.findUniqueOrThrow({ where: { id: staff.branchId } });
     let startsAt: Date;
     let endsAt: Date;
     if (dto.fromDate && dto.toDate) {
       const from = DateTime.fromISO(dto.fromDate, { zone: branch.timezone }).startOf('day');
-      const to = DateTime.fromISO(dto.toDate, { zone: branch.timezone }).plus({ days: 1 }).startOf('day');
+      const to = DateTime.fromISO(dto.toDate, { zone: branch.timezone })
+        .plus({ days: 1 })
+        .startOf('day');
       startsAt = from.toJSDate();
       endsAt = to.toJSDate();
     } else {
@@ -225,16 +328,31 @@ export class StaffService {
       },
     });
     const timeOff = await this.prisma.staffTimeOff.create({
-      data: { businessId: tenant.businessId, staffId, type: dto.type, startsAt, endsAt, note: dto.note },
+      data: {
+        businessId: tenant.businessId,
+        staffId,
+        type: dto.type,
+        startsAt,
+        endsAt,
+        note: dto.note,
+      },
     });
-    await this.audit.log({ actorUserId, businessId: tenant.businessId, action: 'staff.timeoff_add', targetType: 'Staff', targetId: staffId });
+    await this.audit.log({
+      actorUserId,
+      businessId: tenant.businessId,
+      action: 'staff.timeoff_add',
+      targetType: 'Staff',
+      targetId: staffId,
+    });
     // Las citas existentes no se cancelan automáticamente: se informa para que el negocio decida.
     return { timeOff, conflictingAppointments: conflicts };
   }
 
   async removeTimeOff(tenant: TenantContext, staffId: string, id: string) {
     await this.assertStaffAccess(tenant, staffId, true);
-    const res = await this.prisma.staffTimeOff.deleteMany({ where: { id, staffId, businessId: tenant.businessId } });
+    const res = await this.prisma.staffTimeOff.deleteMany({
+      where: { id, staffId, businessId: tenant.businessId },
+    });
     if (!res.count) throw notFound('TIME_OFF_NOT_FOUND');
   }
 
@@ -244,7 +362,10 @@ export class StaffService {
       if (!b) throw badRequest('BRANCH_NOT_IN_BUSINESS');
       return b.id;
     }
-    const first = await tx.branch.findFirst({ where: { businessId, status: 'ACTIVE' }, orderBy: { createdAt: 'asc' } });
+    const first = await tx.branch.findFirst({
+      where: { businessId, status: 'ACTIVE' },
+      orderBy: { createdAt: 'asc' },
+    });
     if (!first) throw conflict('NO_ACTIVE_BRANCH');
     return first.id;
   }
@@ -253,6 +374,8 @@ export class StaffService {
     const unique = [...new Set(serviceIds)];
     const found = await tx.service.count({ where: { businessId, id: { in: unique } } });
     if (found !== unique.length) throw badRequest('SERVICE_NOT_IN_BUSINESS');
-    await tx.staffService.createMany({ data: unique.map((serviceId) => ({ businessId, staffId, serviceId })) });
+    await tx.staffService.createMany({
+      data: unique.map((serviceId) => ({ businessId, staffId, serviceId })),
+    });
   }
 }

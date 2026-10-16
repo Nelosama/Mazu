@@ -11,7 +11,11 @@ import { IncidentsService } from '../admin/incidents.service';
 const MAX_ATTEMPTS = 5;
 const BATCH = 20;
 
-const OWNER_EVENTS: NotificationEvent[] = ['BOOKING_CONFIRMED', 'BOOKING_CANCELED', 'BOOKING_RESCHEDULED'];
+const OWNER_EVENTS: NotificationEvent[] = [
+  'BOOKING_CONFIRMED',
+  'BOOKING_CANCELED',
+  'BOOKING_RESCHEDULED',
+];
 
 @Injectable()
 export class NotificationsService {
@@ -24,7 +28,14 @@ export class NotificationsService {
   ) {
     const e = env();
     if (e.WHATSAPP_PROVIDER === 'meta') {
-      this.providers.set('WHATSAPP', new WhatsAppCloudProvider(e.WHATSAPP_PHONE_NUMBER_ID!, e.WHATSAPP_ACCESS_TOKEN!, e.WHATSAPP_API_VERSION));
+      this.providers.set(
+        'WHATSAPP',
+        new WhatsAppCloudProvider(
+          e.WHATSAPP_PHONE_NUMBER_ID!,
+          e.WHATSAPP_ACCESS_TOKEN!,
+          e.WHATSAPP_API_VERSION,
+        ),
+      );
     }
     if (e.EMAIL_PROVIDER === 'resend') {
       this.providers.set('EMAIL', new ResendEmailProvider(e.RESEND_API_KEY!, e.EMAIL_FROM!));
@@ -57,7 +68,14 @@ export class NotificationsService {
     const a = await tx.appointment.findUniqueOrThrow({
       where: { id: appointmentId },
       include: {
-        business: { include: { memberships: { where: { status: 'ACTIVE', role: { in: ['OWNER', 'ADMIN'] } }, include: { user: true } } } },
+        business: {
+          include: {
+            memberships: {
+              where: { status: 'ACTIVE', role: { in: ['OWNER', 'ADMIN'] } },
+              include: { user: true },
+            },
+          },
+        },
         customer: true,
         service: { select: { name: true } },
         staff: { select: { name: true } },
@@ -65,7 +83,8 @@ export class NotificationsService {
       },
     });
     const base = env().PUBLIC_APP_URL.replace(/\/$/, '');
-    const variant = event === 'BOOKING_RESCHEDULED' || event === 'REMINDER' ? `:${a.startsAt.toISOString()}` : '';
+    const variant =
+      event === 'BOOKING_RESCHEDULED' || event === 'REMINDER' ? `:${a.startsAt.toISOString()}` : '';
     const data: TemplateData = {
       businessName: a.business.name,
       customerName: a.customer?.name ?? a.walkInName,
@@ -104,7 +123,10 @@ export class NotificationsService {
           event,
           recipient: m.user.email,
           locale: m.user.preferredLocale ?? a.business.locale,
-          payload: { ...data, url: `${base}/app/${a.businessId}/agenda` } as unknown as Prisma.InputJsonValue,
+          payload: {
+            ...data,
+            url: `${base}/app/${a.businessId}/agenda`,
+          } as unknown as Prisma.InputJsonValue,
           idempotencyKey: `${event}:${a.id}:EMAIL:${m.user.email}${variant}`,
         });
       }
@@ -138,7 +160,14 @@ export class NotificationsService {
       this.prisma.notification.update({
         where: { id },
         // Tras el envío se elimina el enlace con token del payload almacenado.
-        data: { status, payload: { ...payload, url: payload.url ? '[redacted]' : null } as unknown as Prisma.InputJsonValue, ...extra },
+        data: {
+          status,
+          payload: {
+            ...payload,
+            url: payload.url ? '[redacted]' : null,
+          } as unknown as Prisma.InputJsonValue,
+          ...extra,
+        },
       });
 
     if (!n.recipient) return finish('SKIPPED_NO_RECIPIENT');
@@ -161,11 +190,21 @@ export class NotificationsService {
       ...msg,
     });
     if (result.ok) {
-      return finish('SENT', { provider: provider.name, providerMessageId: result.providerMessageId, sentAt: new Date(), lastError: null });
+      return finish('SENT', {
+        provider: provider.name,
+        providerMessageId: result.providerMessageId,
+        sentAt: new Date(),
+        lastError: null,
+      });
     }
     const exhausted = !result.retryable || n.attempts >= MAX_ATTEMPTS;
     if (exhausted) {
-      await this.incidents.record('notifications', `${provider.name}: ${result.error}`, { event: n.event, channel: n.channel }, 'WARNING');
+      await this.incidents.record(
+        'notifications',
+        `${provider.name}: ${result.error}`,
+        { event: n.event, channel: n.channel },
+        'WARNING',
+      );
       return finish('FAILED', { provider: provider.name, lastError: result.error });
     }
     const backoffMin = 2 ** n.attempts;
@@ -180,7 +219,12 @@ export class NotificationsService {
     const from = new Date(now.getTime() + 2 * 3_600_000);
     const to = new Date(now.getTime() + 24 * 3_600_000);
     const due = await this.prisma.appointment.findMany({
-      where: { type: 'ONLINE', status: 'CONFIRMED', startsAt: { gte: from, lte: to }, business: { status: 'ACTIVE' } },
+      where: {
+        type: 'ONLINE',
+        status: 'CONFIRMED',
+        startsAt: { gte: from, lte: to },
+        business: { status: 'ACTIVE' },
+      },
       select: { id: true, startsAt: true, createdAt: true },
       take: 500,
     });
@@ -198,7 +242,17 @@ export class NotificationsService {
       where: { businessId },
       orderBy: { createdAt: 'desc' },
       take: Math.min(limit, 200),
-      select: { id: true, channel: true, event: true, status: true, provider: true, attempts: true, lastError: true, createdAt: true, sentAt: true },
+      select: {
+        id: true,
+        channel: true,
+        event: true,
+        status: true,
+        provider: true,
+        attempts: true,
+        lastError: true,
+        createdAt: true,
+        sentAt: true,
+      },
     });
     return rows;
   }

@@ -38,7 +38,10 @@ export class RetentionJob {
     const ids = stale.map((c) => c.id);
     if (ids.length) {
       await this.prisma.$transaction([
-        this.prisma.appointment.updateMany({ where: { customerId: { in: ids } }, data: { customerId: null, notes: null, cancelReason: null } }),
+        this.prisma.appointment.updateMany({
+          where: { customerId: { in: ids } },
+          data: { customerId: null, notes: null, cancelReason: null },
+        }),
         this.prisma.customerFeedback.updateMany({
           where: { appointment: { customerId: null }, respondedAt: { lt: cutoff } },
           data: { followUpNote: null },
@@ -50,6 +53,10 @@ export class RetentionJob {
       where: { createdAt: { lt: new Date(now.getTime() - 90 * 86_400_000) } },
     });
     const tokens = await this.prisma.refreshToken.deleteMany({ where: { expiresAt: { lt: now } } });
-    return { anonymizedCustomers: ids.length, notificationsPurged: notifications.count, refreshTokensPurged: tokens.count };
+    return {
+      anonymizedCustomers: ids.length,
+      notificationsPurged: notifications.count,
+      refreshTokensPurged: tokens.count,
+    };
   }
 }

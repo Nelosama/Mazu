@@ -24,7 +24,11 @@ const schema = z
     SUPABASE_URL: z.string().url().optional(),
     SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
     SUPABASE_STORAGE_BUCKET: z.string().default('public-media'),
-    UPLOAD_MAX_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
+    UPLOAD_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(5 * 1024 * 1024),
     LOCAL_STORAGE_DIR: z.string().default('.local-storage'),
 
     NOTIFICATIONS_DEV_LOG: bool,
@@ -52,7 +56,10 @@ const schema = z
       .transform((v) => v === 'true'),
   })
   .superRefine((env, ctx) => {
-    if (env.STORAGE_DRIVER === 'supabase' && (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)) {
+    if (
+      env.STORAGE_DRIVER === 'supabase' &&
+      (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY)
+    ) {
       ctx.addIssue({
         code: 'custom',
         message: 'STORAGE_DRIVER=supabase requiere SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY',
@@ -60,7 +67,10 @@ const schema = z
     }
     if (env.NODE_ENV === 'production') {
       if (env.STORAGE_DRIVER === 'local') {
-        ctx.addIssue({ code: 'custom', message: 'El almacenamiento local no está permitido en producción' });
+        ctx.addIssue({
+          code: 'custom',
+          message: 'El almacenamiento local no está permitido en producción',
+        });
       }
       if (env.NOTIFICATIONS_DEV_LOG) {
         ctx.addIssue({
@@ -70,7 +80,10 @@ const schema = z
       }
     }
     if (env.EMAIL_PROVIDER === 'resend' && (!env.RESEND_API_KEY || !env.EMAIL_FROM)) {
-      ctx.addIssue({ code: 'custom', message: 'EMAIL_PROVIDER=resend requiere RESEND_API_KEY y EMAIL_FROM' });
+      ctx.addIssue({
+        code: 'custom',
+        message: 'EMAIL_PROVIDER=resend requiere RESEND_API_KEY y EMAIL_FROM',
+      });
     }
     if (
       env.WHATSAPP_PROVIDER === 'meta' &&

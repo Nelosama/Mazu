@@ -9,7 +9,12 @@ import { AuditService } from '../audit/audit.service';
 import { PlansService } from '../subscriptions/plans.service';
 import { publicFileUrl } from '../storage/public-url';
 import type { TenantContext } from '../common/request-context';
-import { FeedbackListQueryDto, FeedbackQueryDto, SubmitFeedbackDto, UpdateFollowUpDto } from './dto';
+import {
+  FeedbackListQueryDto,
+  FeedbackQueryDto,
+  SubmitFeedbackDto,
+  UpdateFollowUpDto,
+} from './dto';
 import { categorize, meanWithInterval, MIN_RELIABLE_SAMPLE, round, wilsonInterval } from './stats';
 
 const NEGATIVE: Prisma.CustomerFeedbackWhereInput = {
@@ -29,17 +34,25 @@ export class FeedbackService {
    * una sola vez; en BD solo queda su hash. Devuelve null si el negocio desactivó encuestas
    * o la encuesta ya fue respondida.
    */
-  async createInvitation(tx: Tx, appointmentId: string, opts: { rotate?: boolean } = {}): Promise<string | null> {
+  async createInvitation(
+    tx: Tx,
+    appointmentId: string,
+    opts: { rotate?: boolean } = {},
+  ): Promise<string | null> {
     const appt = await tx.appointment.findUniqueOrThrow({
       where: { id: appointmentId },
       include: { business: { select: { feedbackEnabled: true } }, feedback: true },
     });
-    if (!appt.business.feedbackEnabled || appt.status !== 'COMPLETED' || appt.type === 'BLOCKED') return null;
+    if (!appt.business.feedbackEnabled || appt.status !== 'COMPLETED' || appt.type === 'BLOCKED')
+      return null;
     const token = generateToken();
     const expiresAt = new Date(Date.now() + env().FEEDBACK_TOKEN_TTL_DAYS * 86_400_000);
     if (appt.feedback) {
       if (appt.feedback.respondedAt || !opts.rotate) return null;
-      await tx.customerFeedback.update({ where: { id: appt.feedback.id }, data: { tokenHash: hashToken(token), expiresAt } });
+      await tx.customerFeedback.update({
+        where: { id: appt.feedback.id },
+        data: { tokenHash: hashToken(token), expiresAt },
+      });
       return token;
     }
     await tx.customerFeedback.create({
@@ -63,7 +76,9 @@ export class FeedbackService {
         business: true,
         staff: { select: { name: true } },
         service: { select: { name: true } },
-        appointment: { select: { startsAt: true, status: true, branch: { select: { timezone: true } } } },
+        appointment: {
+          select: { startsAt: true, status: true, branch: { select: { timezone: true } } },
+        },
       },
     });
     if (!fb) throw notFound('FEEDBACK_NOT_FOUND');
@@ -97,7 +112,12 @@ export class FeedbackService {
 
     // Actualización condicional: aunque lleguen dos envíos simultáneos, solo uno se registra.
     const res = await this.prisma.customerFeedback.updateMany({
-      where: { id: fb.id, respondedAt: null, expiresAt: { gt: new Date() }, appointment: { status: 'COMPLETED' } },
+      where: {
+        id: fb.id,
+        respondedAt: null,
+        expiresAt: { gt: new Date() },
+        appointment: { status: 'COMPLETED' },
+      },
       data: {
         rating: dto.rating,
         wouldReturn: dto.wouldReturn,
@@ -107,7 +127,13 @@ export class FeedbackService {
       },
     });
     if (res.count !== 1) throw conflict('FEEDBACK_ALREADY_ANSWERED');
-    await this.audit.log({ businessId: fb.businessId, action: 'feedback.submit', targetType: 'CustomerFeedback', targetId: fb.id, ip });
+    await this.audit.log({
+      businessId: fb.businessId,
+      action: 'feedback.submit',
+      targetType: 'CustomerFeedback',
+      targetId: fb.id,
+      ip,
+    });
     return { ok: true };
   }
 
@@ -154,7 +180,10 @@ export class FeedbackService {
       responses: n,
       responseRate: invitations ? round(n / invitations, 3) : null,
       rating: meanWithInterval(ratings),
-      distribution: [1, 2, 3, 4, 5].map((star) => ({ star, count: ratings.filter((r) => r === star).length })),
+      distribution: [1, 2, 3, 4, 5].map((star) => ({
+        star,
+        count: ratings.filter((r) => r === star).length,
+      })),
       wouldReturn: {
         yes,
         maybe,
@@ -168,7 +197,10 @@ export class FeedbackService {
 
     if (!features.satisfactionReports) return { summary, detailed: false as const };
 
-    const group = (key: 'staffId' | 'serviceId', label: (a: (typeof answered)[number]) => string | undefined) => {
+    const group = (
+      key: 'staffId' | 'serviceId',
+      label: (a: (typeof answered)[number]) => string | undefined,
+    ) => {
       const map = new Map<string, { name: string; ratings: number[]; yes: number }>();
       for (const a of answered) {
         const id = a[key];
@@ -188,7 +220,9 @@ export class FeedbackService {
         .sort((a, b) => b.rating.n - a.rating.n);
     };
 
-    const monthly = await this.prisma.$queryRaw<{ month: string; responses: bigint; avg: number | null }[]>`
+    const monthly = await this.prisma.$queryRaw<
+      { month: string; responses: bigint; avg: number | null }[]
+    >`
       SELECT to_char(date_trunc('month', f."respondedAt" AT TIME ZONE ${tenant.timezone}), 'YYYY-MM') AS month,
              count(*) AS responses,
              avg(f."rating")::float AS avg
@@ -199,7 +233,8 @@ export class FeedbackService {
       GROUP BY 1 ORDER BY 1`;
 
     const categories: Record<string, number> = {};
-    for (const a of answered) for (const c of categorize(a.comment)) categories[c] = (categories[c] ?? 0) + 1;
+    for (const a of answered)
+      for (const c of categorize(a.comment)) categories[c] = (categories[c] ?? 0) + 1;
 
     return {
       summary,
@@ -214,7 +249,12 @@ export class FeedbackService {
       })),
       commentCategories: categories,
       pendingNegative: await this.prisma.customerFeedback.count({
-        where: { ...where, respondedAt: { not: null }, followUpStatus: { not: 'RESOLVED' }, ...NEGATIVE },
+        where: {
+          ...where,
+          respondedAt: { not: null },
+          followUpStatus: { not: 'RESOLVED' },
+          ...NEGATIVE,
+        },
       }),
     };
   }
@@ -231,7 +271,9 @@ export class FeedbackService {
       include: {
         staff: { select: { id: true, name: true } },
         service: { select: { id: true, name: true } },
-        appointment: { select: { startsAt: true, customer: { select: { name: true } }, walkInName: true } },
+        appointment: {
+          select: { startsAt: true, customer: { select: { name: true } }, walkInName: true },
+        },
       },
       orderBy: { respondedAt: 'desc' },
       take: q.limit ?? 50,
@@ -253,7 +295,12 @@ export class FeedbackService {
     }));
   }
 
-  async updateFollowUp(tenant: TenantContext, actorUserId: string, id: string, dto: UpdateFollowUpDto) {
+  async updateFollowUp(
+    tenant: TenantContext,
+    actorUserId: string,
+    id: string,
+    dto: UpdateFollowUpDto,
+  ) {
     const res = await this.prisma.customerFeedback.updateMany({
       where: { id, businessId: tenant.businessId, respondedAt: { not: null } },
       data: { followUpStatus: dto.followUpStatus, followUpNote: dto.followUpNote },

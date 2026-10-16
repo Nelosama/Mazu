@@ -52,7 +52,13 @@ export function localMinuteToInstant(date: string, minute: number, timezone: str
   if (!day.isValid) throw new Error(`Fecha o zona inválida: ${date} ${timezone}`);
   if (minute >= 1440) return day.plus({ days: 1 }).startOf('day').toMillis();
   return DateTime.fromObject(
-    { year: day.year, month: day.month, day: day.day, hour: Math.floor(minute / 60), minute: minute % 60 },
+    {
+      year: day.year,
+      month: day.month,
+      day: day.day,
+      hour: Math.floor(minute / 60),
+      minute: minute % 60,
+    },
     { zone: timezone },
   ).toMillis();
 }
@@ -93,7 +99,10 @@ export function subtractIntervals(base: Interval[], remove: Interval[]): Interva
 }
 
 /** Intervalos laborables de un día local, ya descontados los descansos recurrentes. */
-export function workingIntervalsForDate(date: string, schedule: Omit<StaffScheduleInput, 'busy'>): Interval[] {
+export function workingIntervalsForDate(
+  date: string,
+  schedule: Omit<StaffScheduleInput, 'busy'>,
+): Interval[] {
   const { timezone } = schedule;
   const toInterval = (r: { startMinute: number; endMinute: number }): Interval => ({
     start: localMinuteToInstant(date, r.startMinute, timezone),
@@ -118,7 +127,11 @@ export function workingIntervalsForDate(date: string, schedule: Omit<StaffSchedu
 }
 
 /** Inicios disponibles (ms epoch) para un profesional en un día local. */
-export function computeDaySlots(date: string, schedule: StaffScheduleInput, query: SlotQuery): number[] {
+export function computeDaySlots(
+  date: string,
+  schedule: StaffScheduleInput,
+  query: SlotQuery,
+): number[] {
   const durationMs = query.durationMinutes * 60_000;
   const stepMs = query.stepMinutes * 60_000;
   if (durationMs <= 0 || stepMs <= 0) return [];
@@ -140,7 +153,10 @@ export function computeDaySlots(date: string, schedule: StaffScheduleInput, quer
 
 /** Ventana UTC que cubre un día local completo, útil para cargar ocupaciones. */
 export function dayWindow(date: string, timezone: string): Interval {
-  return { start: localMinuteToInstant(date, 0, timezone), end: localMinuteToInstant(date, 1440, timezone) };
+  return {
+    start: localMinuteToInstant(date, 0, timezone),
+    end: localMinuteToInstant(date, 1440, timezone),
+  };
 }
 
 /** Lista de fechas locales entre `from` y `to` (inclusive). */

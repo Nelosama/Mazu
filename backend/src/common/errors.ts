@@ -25,4 +25,5 @@ export const badRequest = (code: string, message?: string, details?: Record<stri
   new AppError(code, HttpStatus.BAD_REQUEST, message, details);
 export const unauthorized = (code = 'UNAUTHORIZED', message?: string) =>
   new AppError(code, HttpStatus.UNAUTHORIZED, message);
-export const gone = (code: string, message?: string) => new AppError(code, HttpStatus.GONE, message);
+export const gone = (code: string, message?: string) =>
+  new AppError(code, HttpStatus.GONE, message);

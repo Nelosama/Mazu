@@ -16,16 +16,28 @@ export class AuthController {
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('register')
-  async register(@Body() dto: RegisterDto, @Req() req: AppRequest, @Res({ passthrough: true }) res: Response) {
+  async register(
+    @Body() dto: RegisterDto,
+    @Req() req: AppRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const result = await this.auth.register(dto, clientIp(req), req.headers['user-agent']);
-    return { user: result.user, businessId: result.businessId, ...this.setSession(res, result.session) };
+    return {
+      user: result.user,
+      businessId: result.businessId,
+      ...this.setSession(res, result.session),
+    };
   }
 
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @HttpCode(200)
   @Post('login')
-  async login(@Body() dto: LoginDto, @Req() req: AppRequest, @Res({ passthrough: true }) res: Response) {
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: AppRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const result = await this.auth.login(dto, clientIp(req), req.headers['user-agent']);
     return { user: result.user, ...this.setSession(res, result.session) };
   }
@@ -36,7 +48,10 @@ export class AuthController {
   @Post('refresh')
   async refresh(@Req() req: AppRequest, @Res({ passthrough: true }) res: Response) {
     try {
-      const result = await this.auth.refresh(req.cookies?.[REFRESH_COOKIE], req.headers['user-agent']);
+      const result = await this.auth.refresh(
+        req.cookies?.[REFRESH_COOKIE],
+        req.headers['user-agent'],
+      );
       return { user: result.user, ...this.setSession(res, result.session) };
     } catch (err) {
       this.clearCookie(res);

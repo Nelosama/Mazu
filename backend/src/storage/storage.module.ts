@@ -15,7 +15,11 @@ import { LocalMediaController, MediaController } from './media.controller';
       useFactory: (): StorageAdapter => {
         const e = env();
         if (e.STORAGE_DRIVER === 'supabase') {
-          return new SupabaseStorageAdapter(e.SUPABASE_URL!, e.SUPABASE_SERVICE_ROLE_KEY!, e.SUPABASE_STORAGE_BUCKET);
+          return new SupabaseStorageAdapter(
+            e.SUPABASE_URL!,
+            e.SUPABASE_SERVICE_ROLE_KEY!,
+            e.SUPABASE_STORAGE_BUCKET,
+          );
         }
         return new LocalStorageAdapter(e.LOCAL_STORAGE_DIR);
       },

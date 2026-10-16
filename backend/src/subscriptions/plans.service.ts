@@ -34,7 +34,10 @@ export class PlansService {
 
   async featuresFor(businessId: string, tx?: Tx): Promise<PlanFeatures> {
     const client = tx ?? this.prisma;
-    const sub = await client.subscription.findUnique({ where: { businessId }, include: { plan: true } });
+    const sub = await client.subscription.findUnique({
+      where: { businessId },
+      include: { plan: true },
+    });
     if (!sub || sub.status === 'CANCELED') return NO_PLAN;
     const p = sub.plan;
     return {
@@ -53,7 +56,8 @@ export class PlansService {
     const f = await this.featuresFor(businessId, tx);
     if (f.maxStaff === null) return;
     const count = await client.staff.count({ where: { businessId, active: true } });
-    if (count >= f.maxStaff) throw forbidden('PLAN_LIMIT_STAFF', `El plan permite ${f.maxStaff} profesionales activos`);
+    if (count >= f.maxStaff)
+      throw forbidden('PLAN_LIMIT_STAFF', `El plan permite ${f.maxStaff} profesionales activos`);
   }
 
   async assertCanAddBranch(businessId: string, tx?: Tx) {
@@ -61,7 +65,8 @@ export class PlansService {
     const f = await this.featuresFor(businessId, tx);
     if (f.maxBranches === null) return;
     const count = await client.branch.count({ where: { businessId, status: 'ACTIVE' } });
-    if (count >= f.maxBranches) throw forbidden('PLAN_LIMIT_BRANCHES', `El plan permite ${f.maxBranches} sucursales`);
+    if (count >= f.maxBranches)
+      throw forbidden('PLAN_LIMIT_BRANCHES', `El plan permite ${f.maxBranches} sucursales`);
   }
 
   /** Límite mensual de reservas (ONLINE + WALK_IN) contado en la zona horaria del negocio. */
@@ -81,7 +86,10 @@ export class PlansService {
     if (count >= f.maxMonthlyBookings) throw forbidden('PLAN_LIMIT_BOOKINGS');
   }
 
-  async assertFeature(businessId: string, feature: 'satisfactionReports' | 'advancedReports' | 'customBranding') {
+  async assertFeature(
+    businessId: string,
+    feature: 'satisfactionReports' | 'advancedReports' | 'customBranding',
+  ) {
     const f = await this.featuresFor(businessId);
     if (!f[feature]) throw forbidden('PLAN_FEATURE_UNAVAILABLE');
   }

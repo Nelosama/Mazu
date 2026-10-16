@@ -1,0 +1,42 @@
+# Blueprint de Render para el backend. Revisa los valores antes de crear el servicio:
+# crear o desplegar este blueprint puede generar costos en tu cuenta de Render.
+services:
+  - type: web
+    name: booking-saas-api
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: .
+    buildCommand: npm ci && npm run db:generate -w backend && npm run build -w backend
+    preDeployCommand: npm run db:deploy -w backend
+    startCommand: npm run start -w backend
+    healthCheckPath: /api/health
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: '22'
+      - key: TRUST_PROXY
+        value: 'true'
+      - key: COOKIE_SECURE
+        value: 'true'
+      - key: STORAGE_DRIVER
+        value: supabase
+      - key: NOTIFICATIONS_DEV_LOG
+        value: 'false'
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      # Definir manualmente en el panel de Render (secretos, no versionados):
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_DATABASE_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: PUBLIC_APP_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

@@ -59,7 +59,12 @@ export class AppointmentsService {
     });
     if (!service) throw notFound('SERVICE_NOT_FOUND');
 
-    const candidates = await this.candidateStaff(business, service.id, startsAt, dto.staffId ?? null);
+    const candidates = await this.candidateStaff(
+      business,
+      service.id,
+      startsAt,
+      dto.staffId ?? null,
+    );
     if (candidates.length === 0) throw slotUnavailable();
 
     const manageToken = generateToken();
@@ -88,13 +93,21 @@ export class AppointmentsService {
             update: {
               name: dto.customerName,
               ...(dto.whatsappConsent !== undefined
-                ? { whatsappConsent: dto.whatsappConsent, consentAt: dto.whatsappConsent ? new Date() : null }
+                ? {
+                    whatsappConsent: dto.whatsappConsent,
+                    consentAt: dto.whatsappConsent ? new Date() : null,
+                  }
                 : {}),
             },
           });
 
           const active = await tx.appointment.count({
-            where: { businessId: business.id, customerId: customer.id, status: 'CONFIRMED', startsAt: { gt: new Date() } },
+            where: {
+              businessId: business.id,
+              customerId: customer.id,
+              status: 'CONFIRMED',
+              startsAt: { gt: new Date() },
+            },
           });
           if (active >= env().MAX_ACTIVE_BOOKINGS_PER_PHONE) {
             throw new AppError('TOO_MANY_ACTIVE_BOOKINGS', HttpStatus.TOO_MANY_REQUESTS);
@@ -116,12 +129,22 @@ export class AppointmentsService {
               currency: business.currency,
               notes: dto.notes,
               manageTokenHash: hashToken(manageToken),
-              manageTokenExpiresAt: new Date(endsAt.getTime() + MANAGE_TOKEN_GRACE_DAYS * 86_400_000),
+              manageTokenExpiresAt: new Date(
+                endsAt.getTime() + MANAGE_TOKEN_GRACE_DAYS * 86_400_000,
+              ),
             },
           });
-          await this.notifications.enqueueAppointmentEvent(tx, created.id, 'BOOKING_CONFIRMED', { manageToken });
+          await this.notifications.enqueueAppointmentEvent(tx, created.id, 'BOOKING_CONFIRMED', {
+            manageToken,
+          });
           await this.audit.log(
-            { businessId: business.id, action: 'appointment.public_create', targetType: 'Appointment', targetId: created.id, ip },
+            {
+              businessId: business.id,
+              action: 'appointment.public_create',
+              targetType: 'Appointment',
+              targetId: created.id,
+              ip,
+            },
             tx,
           );
           return created;
@@ -129,7 +152,8 @@ export class AppointmentsService {
         return { ...(await this.publicView(appointment.id)), manageToken };
       } catch (err) {
         if (isExclusionViolation(err)) continue; // otro cliente ganó el horario: probar el siguiente profesional
-        if (err instanceof AppError && err.code === 'SLOT_UNAVAILABLE' && candidates.length > 1) continue;
+        if (err instanceof AppError && err.code === 'SLOT_UNAVAILABLE' && candidates.length > 1)
+          continue;
         throw err;
       }
     }
@@ -137,7 +161,12 @@ export class AppointmentsService {
   }
 
   /** Profesionales candidatos para un inicio; con "cualquiera", ordenados por menor carga del día. */
-  private async candidateStaff(business: Business, serviceId: string, startsAt: Date, staffId: string | null) {
+  private async candidateStaff(
+    business: Business,
+    serviceId: string,
+    startsAt: Date,
+    staffId: string | null,
+  ) {
     if (staffId) {
       const ok = await this.prisma.staffService.findFirst({
         where: { businessId: business.id, staffId, serviceId, staff: { active: true } },
@@ -207,7 +236,9 @@ export class AppointmentsService {
         cancelWindowMinutes: a.business.cancelWindowMinutes,
       },
       branch: { name: a.branch.name, address: a.branch.address },
-      service: a.service ? { id: a.service.id, name: a.service.name, durationMinutes: a.service.durationMinutes } : null,
+      service: a.service
+        ? { id: a.service.id, name: a.service.name, durationMinutes: a.service.durationMinutes }
+        : null,
       staff: a.staff,
       customerName: a.customer?.name ?? null,
       price: a.priceSnapshot?.toFixed(2) ?? null,
@@ -242,11 +273,25 @@ export class AppointmentsService {
     await this.prisma.$transaction(async (tx) => {
       const res = await tx.appointment.updateMany({
         where: { id: appt.id, status: 'CONFIRMED' },
-        data: { status: 'CANCELED', canceledAt: new Date(), canceledBy: 'CUSTOMER', cancelReason: reason },
+        data: {
+          status: 'CANCELED',
+          canceledAt: new Date(),
+          canceledBy: 'CUSTOMER',
+          cancelReason: reason,
+        },
       });
       if (res.count !== 1) throw conflict('CANCEL_NOT_ALLOWED');
       await this.notifications.enqueueAppointmentEvent(tx, appt.id, 'BOOKING_CANCELED');
-      await this.audit.log({ businessId: appt.businessId, action: 'appointment.customer_cancel', targetType: 'Appointment', targetId: appt.id, ip }, tx);
+      await this.audit.log(
+        {
+          businessId: appt.businessId,
+          action: 'appointment.customer_cancel',
+          targetType: 'Appointment',
+          targetId: appt.id,
+          ip,
+        },
+        tx,
+      );
     });
     return this.publicView(appt.id);
   }
@@ -262,7 +307,12 @@ export class AppointmentsService {
       await this.prisma.$transaction(async (tx) => {
         const ok = await this.availability.isStartAvailable(
           appt.business,
-          { serviceId: appt.serviceId!, staffId: appt.staffId, startsAt, excludeAppointmentId: appt.id },
+          {
+            serviceId: appt.serviceId!,
+            staffId: appt.staffId,
+            startsAt,
+            excludeAppointmentId: appt.id,
+          },
           tx,
         );
         if (!ok) throw slotUnavailable();
@@ -276,7 +326,9 @@ export class AppointmentsService {
           },
         });
         if (res.count !== 1) throw conflict('RESCHEDULE_NOT_ALLOWED');
-        await this.notifications.enqueueAppointmentEvent(tx, appt.id, 'BOOKING_RESCHEDULED', { manageToken: token });
+        await this.notifications.enqueueAppointmentEvent(tx, appt.id, 'BOOKING_RESCHEDULED', {
+          manageToken: token,
+        });
         await this.audit.log(
           {
             businessId: appt.businessId,
@@ -301,7 +353,8 @@ export class AppointmentsService {
   async agenda(tenant: TenantContext, q: AgendaQueryDto) {
     const from = new Date(q.from);
     const to = new Date(q.to);
-    if (!(to > from) || to.getTime() - from.getTime() > MAX_AGENDA_RANGE_MS) throw badRequest('INVALID_DATE_RANGE');
+    if (!(to > from) || to.getTime() - from.getTime() > MAX_AGENDA_RANGE_MS)
+      throw badRequest('INVALID_DATE_RANGE');
     const items = await this.prisma.appointment.findMany({
       where: {
         businessId: tenant.businessId,
@@ -333,7 +386,9 @@ export class AppointmentsService {
         let duration = dto.durationMinutes;
         let price: Prisma.Decimal | null = null;
         if (dto.serviceId) {
-          const service = await tx.service.findFirst({ where: { id: dto.serviceId, businessId: tenant.businessId } });
+          const service = await tx.service.findFirst({
+            where: { id: dto.serviceId, businessId: tenant.businessId },
+          });
           if (!service) throw notFound('SERVICE_NOT_FOUND');
           duration ??= service.durationMinutes;
           price = service.price;
@@ -359,7 +414,16 @@ export class AppointmentsService {
           },
           include: adminAppointmentInclude,
         });
-        await this.audit.log({ actorUserId, businessId: tenant.businessId, action: 'appointment.walk_in', targetType: 'Appointment', targetId: created.id }, tx);
+        await this.audit.log(
+          {
+            actorUserId,
+            businessId: tenant.businessId,
+            action: 'appointment.walk_in',
+            targetType: 'Appointment',
+            targetId: created.id,
+          },
+          tx,
+        );
         return created;
       });
       return serializeAdminAppointment(appt);
@@ -397,7 +461,16 @@ export class AppointmentsService {
           },
           include: adminAppointmentInclude,
         });
-        await this.audit.log({ actorUserId, businessId: tenant.businessId, action: 'appointment.block', targetType: 'Appointment', targetId: created.id }, tx);
+        await this.audit.log(
+          {
+            actorUserId,
+            businessId: tenant.businessId,
+            action: 'appointment.block',
+            targetType: 'Appointment',
+            targetId: created.id,
+          },
+          tx,
+        );
         return created;
       });
       return serializeAdminAppointment(appt);
@@ -408,7 +481,9 @@ export class AppointmentsService {
   }
 
   private async findForTenant(tenant: TenantContext, id: string): Promise<Appointment> {
-    const appt = await this.prisma.appointment.findFirst({ where: { id, businessId: tenant.businessId } });
+    const appt = await this.prisma.appointment.findFirst({
+      where: { id, businessId: tenant.businessId },
+    });
     if (!appt) throw notFound('APPOINTMENT_NOT_FOUND');
     this.assertOwnStaff(tenant, appt.staffId);
     return appt;
@@ -444,15 +519,31 @@ export class AppointmentsService {
       if (action === 'complete') {
         feedbackToken = await this.feedback.createInvitation(tx, id);
         if (feedbackToken && appt.type === 'ONLINE') {
-          await this.notifications.enqueueAppointmentEvent(tx, id, 'FEEDBACK_INVITATION', { feedbackToken });
+          await this.notifications.enqueueAppointmentEvent(tx, id, 'FEEDBACK_INVITATION', {
+            feedbackToken,
+          });
         }
       }
-      await this.audit.log({ actorUserId, businessId: tenant.businessId, action: `appointment.${action}`, targetType: 'Appointment', targetId: id }, tx);
+      await this.audit.log(
+        {
+          actorUserId,
+          businessId: tenant.businessId,
+          action: `appointment.${action}`,
+          targetType: 'Appointment',
+          targetId: id,
+        },
+        tx,
+      );
     });
-    const updated = await this.prisma.appointment.findUniqueOrThrow({ where: { id }, include: adminAppointmentInclude });
+    const updated = await this.prisma.appointment.findUniqueOrThrow({
+      where: { id },
+      include: adminAppointmentInclude,
+    });
     return {
       ...serializeAdminAppointment(updated),
-      ...(feedbackToken ? { feedbackUrl: `${env().PUBLIC_APP_URL.replace(/\/$/, '')}/f/${feedbackToken}` } : {}),
+      ...(feedbackToken
+        ? { feedbackUrl: `${env().PUBLIC_APP_URL.replace(/\/$/, '')}/f/${feedbackToken}` }
+        : {}),
     };
   }
 
@@ -466,7 +557,12 @@ export class AppointmentsService {
     return this.transition(t, u, id, 'no_show');
   }
 
-  async adminReschedule(tenant: TenantContext, actorUserId: string, id: string, dto: AdminRescheduleDto) {
+  async adminReschedule(
+    tenant: TenantContext,
+    actorUserId: string,
+    id: string,
+    dto: AdminRescheduleDto,
+  ) {
     const appt = await this.findForTenant(tenant, id);
     if (appt.status !== 'CONFIRMED') throw conflict('INVALID_STATUS_TRANSITION');
     const staffId = dto.staffId ?? appt.staffId;
@@ -477,7 +573,9 @@ export class AppointmentsService {
       await this.prisma.$transaction(async (tx) => {
         const staff = await this.loadStaff(tx, tenant.businessId, staffId);
         if (appt.serviceId && staffId !== appt.staffId) {
-          const offers = await tx.staffService.findFirst({ where: { staffId, serviceId: appt.serviceId } });
+          const offers = await tx.staffService.findFirst({
+            where: { staffId, serviceId: appt.serviceId },
+          });
           if (!offers) throw badRequest('STAFF_DOES_NOT_OFFER_SERVICE');
         }
         await tx.appointment.update({
@@ -488,11 +586,16 @@ export class AppointmentsService {
             staffId,
             branchId: staff.branchId,
             ...(appt.manageTokenHash
-              ? { manageTokenExpiresAt: new Date(endsAt.getTime() + MANAGE_TOKEN_GRACE_DAYS * 86_400_000) }
+              ? {
+                  manageTokenExpiresAt: new Date(
+                    endsAt.getTime() + MANAGE_TOKEN_GRACE_DAYS * 86_400_000,
+                  ),
+                }
               : {}),
           },
         });
-        if (appt.type === 'ONLINE') await this.notifications.enqueueAppointmentEvent(tx, id, 'BOOKING_RESCHEDULED');
+        if (appt.type === 'ONLINE')
+          await this.notifications.enqueueAppointmentEvent(tx, id, 'BOOKING_RESCHEDULED');
         await this.audit.log(
           {
             actorUserId,
@@ -509,7 +612,10 @@ export class AppointmentsService {
       if (isExclusionViolation(err)) throw slotUnavailable();
       throw err;
     }
-    const updated = await this.prisma.appointment.findUniqueOrThrow({ where: { id }, include: adminAppointmentInclude });
+    const updated = await this.prisma.appointment.findUniqueOrThrow({
+      where: { id },
+      include: adminAppointmentInclude,
+    });
     return serializeAdminAppointment(updated);
   }
 
@@ -517,13 +623,17 @@ export class AppointmentsService {
   async regenerateFeedbackLink(tenant: TenantContext, id: string) {
     const appt = await this.findForTenant(tenant, id);
     if (appt.status !== 'COMPLETED') throw conflict('APPOINTMENT_NOT_COMPLETED');
-    const token = await this.prisma.$transaction((tx) => this.feedback.createInvitation(tx, id, { rotate: true }));
+    const token = await this.prisma.$transaction((tx) =>
+      this.feedback.createInvitation(tx, id, { rotate: true }),
+    );
     if (!token) throw gone('FEEDBACK_ALREADY_ANSWERED');
     return { feedbackUrl: `${env().PUBLIC_APP_URL.replace(/\/$/, '')}/f/${token}` };
   }
 }
 
-export function toDayList(map: Map<string, { startsAt: string; endsAt: string; staffIds: string[] }[]>) {
+export function toDayList(
+  map: Map<string, { startsAt: string; endsAt: string; staffIds: string[] }[]>,
+) {
   return [...map.entries()].map(([date, slots]) => ({ date, slots }));
 }
 

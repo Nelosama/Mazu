@@ -53,7 +53,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const err = exception instanceof Error ? exception : new Error(String(exception));
     this.logger.error(`${req.method} ${req.path}: ${err.message}`, err.stack);
-    void this.incidents.record('http', err.message, { method: req.method, route: req.route?.path ?? req.path });
+    void this.incidents.record('http', err.message, {
+      method: req.method,
+      route: req.route?.path ?? req.path,
+    });
     res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       error: { code: 'INTERNAL_ERROR', message: 'Error interno. Ya registramos la incidencia.' },
     });

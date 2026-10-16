@@ -15,13 +15,28 @@ import {
 } from '@nestjs/common';
 import { PlatformAdminGuard } from '../auth/platform-admin.guard';
 import { TenantGuard } from '../auth/tenant.guard';
-import { AppRequest, AuthUser, CurrentUser, Roles, Tenant, TenantContext, clientIp } from '../common/request-context';
+import {
+  AppRequest,
+  AuthUser,
+  CurrentUser,
+  Roles,
+  Tenant,
+  TenantContext,
+  clientIp,
+} from '../common/request-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { notFound } from '../common/errors';
 import { AdminService } from './admin.service';
 import { RetentionJob } from './retention.job';
-import { AdminBusinessStatusDto, AdminCreateBusinessDto, AdminSubscriptionDto, PlanDto, SupportAccessDto, SupportGrantDto } from './dto';
+import {
+  AdminBusinessStatusDto,
+  AdminCreateBusinessDto,
+  AdminSubscriptionDto,
+  PlanDto,
+  SupportAccessDto,
+  SupportGrantDto,
+} from './dto';
 import { AuthModule } from '../auth/auth.module';
 import { BusinessesModule } from '../businesses/businesses.module';
 
@@ -46,18 +61,33 @@ export class AdminController {
   }
 
   @Patch('businesses/:id/status')
-  status(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: AdminBusinessStatusDto, @Req() req: AppRequest) {
+  status(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AdminBusinessStatusDto,
+    @Req() req: AppRequest,
+  ) {
     return this.admin.setStatus(u.id, id, dto, clientIp(req));
   }
 
   @Patch('businesses/:id/subscription')
-  subscription(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: AdminSubscriptionDto, @Req() req: AppRequest) {
+  subscription(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AdminSubscriptionDto,
+    @Req() req: AppRequest,
+  ) {
     return this.admin.setSubscription(u.id, id, dto, clientIp(req));
   }
 
   @HttpCode(200)
   @Post('businesses/:id/support/appointments')
-  support(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: SupportAccessDto, @Req() req: AppRequest) {
+  support(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SupportAccessDto,
+    @Req() req: AppRequest,
+  ) {
     return this.admin.supportAppointments(u.id, id, dto, clientIp(req));
   }
 
@@ -72,7 +102,11 @@ export class AdminController {
   }
 
   @Patch('plans/:id')
-  updatePlan(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: PlanDto) {
+  updatePlan(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: PlanDto,
+  ) {
     return this.admin.updatePlan(u.id, id, dto);
   }
 
@@ -104,27 +138,56 @@ export class SupportGrantsController {
 
   @Get()
   list(@Tenant() t: TenantContext) {
-    return this.prisma.supportAccessGrant.findMany({ where: { businessId: t.businessId }, orderBy: { createdAt: 'desc' }, take: 20 });
+    return this.prisma.supportAccessGrant.findMany({
+      where: { businessId: t.businessId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
   }
 
   @Post()
-  async create(@Tenant() t: TenantContext, @CurrentUser() u: AuthUser, @Body() dto: SupportGrantDto) {
+  async create(
+    @Tenant() t: TenantContext,
+    @CurrentUser() u: AuthUser,
+    @Body() dto: SupportGrantDto,
+  ) {
     const grant = await this.prisma.supportAccessGrant.create({
-      data: { businessId: t.businessId, grantedById: u.id, reason: dto.reason, expiresAt: new Date(Date.now() + dto.hours * 3_600_000) },
+      data: {
+        businessId: t.businessId,
+        grantedById: u.id,
+        reason: dto.reason,
+        expiresAt: new Date(Date.now() + dto.hours * 3_600_000),
+      },
     });
-    await this.audit.log({ actorUserId: u.id, businessId: t.businessId, action: 'support_grant.create', targetType: 'SupportAccessGrant', targetId: grant.id });
+    await this.audit.log({
+      actorUserId: u.id,
+      businessId: t.businessId,
+      action: 'support_grant.create',
+      targetType: 'SupportAccessGrant',
+      targetId: grant.id,
+    });
     return grant;
   }
 
   @HttpCode(204)
   @Delete(':id')
-  async revoke(@Tenant() t: TenantContext, @CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+  async revoke(
+    @Tenant() t: TenantContext,
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     const res = await this.prisma.supportAccessGrant.updateMany({
       where: { id, businessId: t.businessId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
     if (!res.count) throw notFound();
-    await this.audit.log({ actorUserId: u.id, businessId: t.businessId, action: 'support_grant.revoke', targetType: 'SupportAccessGrant', targetId: id });
+    await this.audit.log({
+      actorUserId: u.id,
+      businessId: t.businessId,
+      action: 'support_grant.revoke',
+      targetType: 'SupportAccessGrant',
+      targetId: id,
+    });
   }
 }
 

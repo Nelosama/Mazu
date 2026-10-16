@@ -40,12 +40,20 @@ export class MediaController {
   upload(
     @Tenant() tenant: TenantContext,
     @CurrentUser() user: AuthUser,
-    @Param('kind', new ParseEnumPipe(Object.fromEntries(MEDIA_KINDS.map((k) => [k, k])))) kind: MediaKind,
+    @Param('kind', new ParseEnumPipe(Object.fromEntries(MEDIA_KINDS.map((k) => [k, k]))))
+    kind: MediaKind,
     @UploadedFile() file: Express.Multer.File | undefined,
     @Query('targetId', new ParseUUIDPipe({ optional: true })) targetId?: string,
     @Body('caption') caption?: string,
   ) {
-    return this.media.upload(tenant, user.id, kind, file, targetId, typeof caption === 'string' ? caption : undefined);
+    return this.media.upload(
+      tenant,
+      user.id,
+      kind,
+      file,
+      targetId,
+      typeof caption === 'string' ? caption : undefined,
+    );
   }
 
   @Get('portfolio')

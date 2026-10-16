@@ -3,7 +3,11 @@
 export const MIN_RELIABLE_SAMPLE = 10;
 
 /** Intervalo de Wilson al 95 % para una proporción. */
-export function wilsonInterval(successes: number, n: number, z = 1.96): { low: number; high: number } | null {
+export function wilsonInterval(
+  successes: number,
+  n: number,
+  z = 1.96,
+): { low: number; high: number } | null {
   if (n === 0) return null;
   const p = successes / n;
   const denom = 1 + (z * z) / n;
@@ -37,10 +41,30 @@ export function round(v: number, d = 2) {
 
 /** Categorías simples de comentarios por palabras clave (sin IA de pago). */
 const CATEGORIES: Record<string, string[]> = {
-  waiting_time: ['espera', 'esperar', 'tarde', 'retraso', 'demora', 'wait', 'late', 'delay', 'atraso'],
+  waiting_time: [
+    'espera',
+    'esperar',
+    'tarde',
+    'retraso',
+    'demora',
+    'wait',
+    'late',
+    'delay',
+    'atraso',
+  ],
   price: ['precio', 'caro', 'costoso', 'price', 'expensive', 'cost', 'preço', 'caro'],
   cleanliness: ['limpio', 'limpieza', 'sucio', 'clean', 'dirty', 'higiene', 'hygiene', 'limpeza'],
-  attention: ['atención', 'atencion', 'amable', 'trato', 'grosero', 'friendly', 'rude', 'service', 'atendimento'],
+  attention: [
+    'atención',
+    'atencion',
+    'amable',
+    'trato',
+    'grosero',
+    'friendly',
+    'rude',
+    'service',
+    'atendimento',
+  ],
   result: ['corte', 'resultado', 'quedó', 'quedo', 'result', 'haircut', 'uñas', 'nails', 'color'],
   booking: ['reserva', 'cita', 'agenda', 'booking', 'appointment', 'horario', 'agendamento'],
 };

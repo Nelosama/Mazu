@@ -33,7 +33,13 @@ export class CreateBusinessDto {
   @Transform(upper) @IsCurrencyCode() currency: string;
   @IsTimezone() timezone: string;
   @IsIn(SUPPORTED_LOCALES) locale: string;
-  @IsOptional() @Transform(trim) @IsString() @Matches(SLUG) @MinLength(3) @MaxLength(60) slug?: string;
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @Matches(SLUG)
+  @MinLength(3)
+  @MaxLength(60)
+  slug?: string;
   @IsOptional() @Transform(trim) @IsString() @MaxLength(1000) description?: string;
 }
 
@@ -46,7 +52,13 @@ export class UpdateBusinessDto {
   @IsOptional() @Transform(upper) @IsCurrencyCode() currency?: string;
   @IsOptional() @IsTimezone() timezone?: string;
   @IsOptional() @IsIn(SUPPORTED_LOCALES) locale?: string;
-  @IsOptional() @Transform(trim) @IsString() @Matches(SLUG) @MinLength(3) @MaxLength(60) slug?: string;
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @Matches(SLUG)
+  @MinLength(3)
+  @MaxLength(60)
+  slug?: string;
   @IsOptional() @IsInt() @IsIn([5, 10, 15, 20, 30, 45, 60]) slotIntervalMinutes?: number;
   @IsOptional() @IsInt() @Min(0) @Max(10080) minLeadMinutes?: number;
   @IsOptional() @IsInt() @Min(1) @Max(365) maxAdvanceDays?: number;

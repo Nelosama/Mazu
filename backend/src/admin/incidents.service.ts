@@ -10,7 +10,12 @@ export class IncidentsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async record(source: string, message: string, context?: Record<string, unknown>, severity: IncidentSeverity = 'ERROR') {
+  async record(
+    source: string,
+    message: string,
+    context?: Record<string, unknown>,
+    severity: IncidentSeverity = 'ERROR',
+  ) {
     const normalized = message
       .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, ':uuid')
       .replace(/\+?\d{6,}/g, ':num')
@@ -19,7 +24,13 @@ export class IncidentsService {
     try {
       await this.prisma.systemIncident.upsert({
         where: { fingerprint },
-        create: { fingerprint, source, severity, message: normalized, context: context as Prisma.InputJsonValue },
+        create: {
+          fingerprint,
+          source,
+          severity,
+          message: normalized,
+          context: context as Prisma.InputJsonValue,
+        },
         update: { occurrences: { increment: 1 }, lastSeenAt: new Date(), resolvedAt: null },
       });
     } catch (err) {

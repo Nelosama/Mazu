@@ -24,7 +24,8 @@ export class TenantGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<AppRequest>();
     const businessId = req.params.businessId;
     if (!req.user) throw forbidden();
-    if (typeof businessId !== 'string' || !UUID.test(businessId)) throw notFound('BUSINESS_NOT_FOUND');
+    if (typeof businessId !== 'string' || !UUID.test(businessId))
+      throw notFound('BUSINESS_NOT_FOUND');
 
     const membership = await this.prisma.businessMembership.findUnique({
       where: { userId_businessId: { userId: req.user.id, businessId } },

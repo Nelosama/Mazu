@@ -38,7 +38,12 @@ export class AuthService {
     try {
       const { user, business } = await this.prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
-          data: { name: dto.name, email: dto.email, passwordHash, preferredLocale: dto.preferredLocale ?? dto.business.locale },
+          data: {
+            name: dto.name,
+            email: dto.email,
+            passwordHash,
+            preferredLocale: dto.preferredLocale ?? dto.business.locale,
+          },
         });
         const business = await this.businesses.createWithOwner(tx, user.id, dto.business);
         await this.audit.log({ actorUserId: user.id, action: 'auth.register', ip }, tx);
@@ -85,7 +90,8 @@ export class AuthService {
       await this.audit.log({ actorUserId: record.userId, action: 'auth.refresh_reuse_detected' });
       throw unauthorized('REFRESH_INVALID');
     }
-    if (record.expiresAt < new Date() || record.user.status !== 'ACTIVE') throw unauthorized('REFRESH_INVALID');
+    if (record.expiresAt < new Date() || record.user.status !== 'ACTIVE')
+      throw unauthorized('REFRESH_INVALID');
 
     // Revocación condicional: si dos peticiones concurrentes usan el mismo token, solo una gana.
     const revoked = await this.prisma.refreshToken.updateMany({
@@ -99,7 +105,9 @@ export class AuthService {
 
   async logout(rawToken: string | undefined) {
     if (!rawToken) return;
-    const record = await this.prisma.refreshToken.findUnique({ where: { tokenHash: hashToken(rawToken) } });
+    const record = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash: hashToken(rawToken) },
+    });
     if (record) {
       await this.prisma.refreshToken.updateMany({
         where: { familyId: record.familyId, revokedAt: null },
@@ -113,8 +121,14 @@ export class AuthService {
     const ok = await verifyPassword(user.passwordHash, dto.currentPassword);
     if (!ok) throw unauthorized('INVALID_CREDENTIALS');
     await this.prisma.$transaction([
-      this.prisma.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(dto.newPassword) } }),
-      this.prisma.refreshToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { passwordHash: await hashPassword(dto.newPassword) },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
     ]);
     await this.audit.log({ actorUserId: userId, action: 'auth.password_changed' });
   }
@@ -125,12 +139,23 @@ export class AuthService {
       include: { platformAdmin: true },
     });
     const memberships = await this.businesses.listForUser(userId);
-    return { user: this.publicUser(user), isPlatformAdmin: Boolean(user.platformAdmin), memberships };
+    return {
+      user: this.publicUser(user),
+      isPlatformAdmin: Boolean(user.platformAdmin),
+      memberships,
+    };
   }
 
-  private async issueSession(userId: string, familyId: string, userAgent?: string): Promise<IssuedSession> {
+  private async issueSession(
+    userId: string,
+    familyId: string,
+    userAgent?: string,
+  ): Promise<IssuedSession> {
     const ttl = env().JWT_ACCESS_TTL_SECONDS;
-    const accessToken = await this.jwt.signAsync({ sub: userId, typ: 'access' }, { expiresIn: ttl });
+    const accessToken = await this.jwt.signAsync(
+      { sub: userId, typ: 'access' },
+      { expiresIn: ttl },
+    );
     const refreshToken = generateToken(48);
     const refreshExpiresAt = new Date(Date.now() + env().REFRESH_TOKEN_TTL_DAYS * 86_400_000);
     await this.prisma.refreshToken.create({
@@ -145,7 +170,12 @@ export class AuthService {
     return { accessToken, expiresIn: ttl, refreshToken, refreshExpiresAt };
   }
 
-  private publicUser(u: { id: string; name: string; email: string; preferredLocale: string | null }) {
+  private publicUser(u: {
+    id: string;
+    name: string;
+    email: string;
+    preferredLocale: string | null;
+  }) {
     return { id: u.id, name: u.name, email: u.email, preferredLocale: u.preferredLocale };
   }
 }

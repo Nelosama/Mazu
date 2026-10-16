@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Header, HttpCode, Module, Param, Post, Query, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  Module,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,7 +19,13 @@ import { notFound } from '../common/errors';
 import { AvailabilityService } from '../availability/availability.service';
 import { AppointmentsModule } from '../appointments/appointments.module';
 import { AppointmentsService, toDayList } from '../appointments/appointments.service';
-import { AvailabilityQueryDto, CancelDto, PublicBookingDto, RescheduleByTokenDto, TokenAvailabilityQueryDto } from '../appointments/dto';
+import {
+  AvailabilityQueryDto,
+  CancelDto,
+  PublicBookingDto,
+  RescheduleByTokenDto,
+  TokenAvailabilityQueryDto,
+} from '../appointments/dto';
 import { FeedbackService } from '../feedback/feedback.service';
 import { SubmitFeedbackDto } from '../feedback/dto';
 import { PlansService } from '../subscriptions/plans.service';
@@ -22,7 +40,10 @@ function assertSlug(slug: string) {
 }
 
 const escapeHtml = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 
 @Public()
 @Controller('public')
@@ -48,7 +69,10 @@ export class PublicController {
     const b = await this.activeBusiness(slug);
     const [features, branches, services, staff, portfolio] = await Promise.all([
       this.plans.featuresFor(b.id),
-      this.prisma.branch.findMany({ where: { businessId: b.id, status: 'ACTIVE' }, select: { id: true, name: true, address: true, timezone: true } }),
+      this.prisma.branch.findMany({
+        where: { businessId: b.id, status: 'ACTIVE' },
+        select: { id: true, name: true, address: true, timezone: true },
+      }),
       this.prisma.service.findMany({
         where: { businessId: b.id, active: true },
         include: { staff: { where: { staff: { active: true } }, select: { staffId: true } } },
@@ -59,7 +83,11 @@ export class PublicController {
         include: { services: { select: { serviceId: true } } },
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       }),
-      this.prisma.portfolioItem.findMany({ where: { businessId: b.id }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }], take: 30 }),
+      this.prisma.portfolioItem.findMany({
+        where: { businessId: b.id },
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+        take: 30,
+      }),
     ]);
     const activeServiceIds = new Set(services.map((s) => s.id));
     return {
@@ -101,7 +129,12 @@ export class PublicController {
         photoUrl: publicFileUrl(s.photoPath),
         serviceIds: s.services.map((x) => x.serviceId).filter((id) => activeServiceIds.has(id)),
       })),
-      portfolio: portfolio.map((p) => ({ id: p.id, staffId: p.staffId, caption: p.caption, url: publicFileUrl(p.path) })),
+      portfolio: portfolio.map((p) => ({
+        id: p.id,
+        staffId: p.staffId,
+        caption: p.caption,
+        url: publicFileUrl(p.path),
+      })),
     };
   }
 
@@ -109,7 +142,12 @@ export class PublicController {
   @Get('businesses/:slug/availability')
   async availabilityFor(@Param('slug') slug: string, @Query() q: AvailabilityQueryDto) {
     const b = await this.activeBusiness(slug);
-    const map = await this.availability.slots(b, { serviceId: q.serviceId, staffId: q.staffId, from: q.from, to: q.to ?? q.from });
+    const map = await this.availability.slots(b, {
+      serviceId: q.serviceId,
+      staffId: q.staffId,
+      from: q.from,
+      to: q.to ?? q.from,
+    });
     return toDayList(map);
   }
 
@@ -142,7 +180,11 @@ export class PublicController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(200)
   @Post('manage/:token/reschedule')
-  reschedule(@Param('token') token: string, @Body() dto: RescheduleByTokenDto, @Req() req: AppRequest) {
+  reschedule(
+    @Param('token') token: string,
+    @Body() dto: RescheduleByTokenDto,
+    @Req() req: AppRequest,
+  ) {
     return this.appointments.rescheduleByToken(token, dto.startsAt, clientIp(req));
   }
 

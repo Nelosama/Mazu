@@ -9,7 +9,11 @@ import { BusinessesModule } from '../businesses/businesses.module';
   imports: [
     JwtModule.registerAsync({
       global: true,
-      useFactory: () => ({ secret: env().JWT_ACCESS_SECRET, signOptions: { issuer: 'booking-saas', audience: 'booking-saas' }, verifyOptions: { issuer: 'booking-saas', audience: 'booking-saas' } }),
+      useFactory: () => ({
+        secret: env().JWT_ACCESS_SECRET,
+        signOptions: { issuer: 'booking-saas', audience: 'booking-saas' },
+        verifyOptions: { issuer: 'booking-saas', audience: 'booking-saas' },
+      }),
     }),
     BusinessesModule,
   ],

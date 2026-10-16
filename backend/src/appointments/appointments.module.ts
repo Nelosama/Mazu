@@ -1,8 +1,26 @@
-import { Body, Controller, Get, HttpCode, Module, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Module,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { TenantGuard } from '../auth/tenant.guard';
 import { AuthUser, CurrentUser, Tenant, TenantContext } from '../common/request-context';
 import { AppointmentsService, toDayList } from './appointments.service';
-import { AdminRescheduleDto, AgendaQueryDto, AvailabilityQueryDto, CancelDto, CreateBlockDto, CreateWalkInDto } from './dto';
+import {
+  AdminRescheduleDto,
+  AgendaQueryDto,
+  AvailabilityQueryDto,
+  CancelDto,
+  CreateBlockDto,
+  CreateWalkInDto,
+} from './dto';
 import { AvailabilityService } from '../availability/availability.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -28,25 +46,43 @@ export class AppointmentsController {
 
   @HttpCode(200)
   @Post(':id/cancel')
-  cancel(@Tenant() t: TenantContext, @CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CancelDto) {
+  cancel(
+    @Tenant() t: TenantContext,
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CancelDto,
+  ) {
     return this.appointments.cancel(t, u.id, id, dto.reason);
   }
 
   @HttpCode(200)
   @Post(':id/complete')
-  complete(@Tenant() t: TenantContext, @CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+  complete(
+    @Tenant() t: TenantContext,
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.appointments.complete(t, u.id, id);
   }
 
   @HttpCode(200)
   @Post(':id/no-show')
-  noShow(@Tenant() t: TenantContext, @CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+  noShow(
+    @Tenant() t: TenantContext,
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.appointments.noShow(t, u.id, id);
   }
 
   @HttpCode(200)
   @Post(':id/reschedule')
-  reschedule(@Tenant() t: TenantContext, @CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: AdminRescheduleDto) {
+  reschedule(
+    @Tenant() t: TenantContext,
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AdminRescheduleDto,
+  ) {
     return this.appointments.adminReschedule(t, u.id, id, dto);
   }
 
@@ -69,7 +105,11 @@ export class AdminAvailabilityController {
   @Get()
   async get(@Tenant() t: TenantContext, @Query() q: AvailabilityQueryDto) {
     const business = await this.prisma.business.findUniqueOrThrow({ where: { id: t.businessId } });
-    const map = await this.availability.slots(business, { ...q, to: q.to ?? q.from, ignoreLeadTime: true });
+    const map = await this.availability.slots(business, {
+      ...q,
+      to: q.to ?? q.from,
+      ignoreLeadTime: true,
+    });
     return toDayList(map);
   }
 }

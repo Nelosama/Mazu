@@ -1,5 +1,13 @@
 import { Transform, Type } from 'class-transformer';
-import { IsEmail, IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
 import { CreateBusinessDto } from '../businesses/dto';
 import { SUPPORTED_LOCALES } from '../common/validation';
 

@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Global, Module, Param, ParseUUIDPipe, Patch, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Global,
+  Module,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { TenantGuard } from '../auth/tenant.guard';
 import { AuthUser, CurrentUser, Roles, Tenant, TenantContext } from '../common/request-context';
 import { FeedbackService } from './feedback.service';
@@ -22,11 +33,20 @@ export class FeedbackController {
   }
 
   @Patch(':id')
-  update(@Tenant() t: TenantContext, @CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateFollowUpDto) {
+  update(
+    @Tenant() t: TenantContext,
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateFollowUpDto,
+  ) {
     return this.feedback.updateFollowUp(t, u.id, id, dto);
   }
 }
 
 @Global()
-@Module({ controllers: [FeedbackController], providers: [FeedbackService], exports: [FeedbackService] })
+@Module({
+  controllers: [FeedbackController],
+  providers: [FeedbackService],
+  exports: [FeedbackService],
+})
 export class FeedbackModule {}

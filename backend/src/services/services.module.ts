@@ -35,14 +35,18 @@ import { publicFileUrl } from '../storage/public-url';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 const MONEY = /^\d{1,10}(\.\d{1,2})?$/;
-const asMoneyString = ({ value }: { value: unknown }) => (typeof value === 'number' ? String(value) : value);
+const asMoneyString = ({ value }: { value: unknown }) =>
+  typeof value === 'number' ? String(value) : value;
 
 export class CreateServiceDto {
   @Transform(trim) @IsString() @MinLength(2) @MaxLength(80) name: string;
   @IsOptional() @Transform(trim) @IsString() @MaxLength(1000) description?: string;
   @IsOptional() @Transform(trim) @IsString() @MaxLength(60) category?: string;
   // Importe como cadena decimal para no perder precisión ("250.00").
-  @Transform(asMoneyString) @IsString() @Matches(MONEY, { message: 'price debe ser un importe decimal' }) price: string;
+  @Transform(asMoneyString)
+  @IsString()
+  @Matches(MONEY, { message: 'price debe ser un importe decimal' })
+  price: string;
   @IsInt() @Min(5) @Max(720) durationMinutes: number;
   @IsOptional() @IsBoolean() active?: boolean;
   @IsOptional() @IsInt() @Min(0) @Max(10000) sortOrder?: number;
@@ -99,14 +103,25 @@ export class ServicesService {
         data: { ...data, price: new Prisma.Decimal(data.price), businessId: tenant.businessId },
       });
       if (staffIds?.length) await this.assignStaff(tx, tenant.businessId, created.id, staffIds);
-      return tx.service.findUniqueOrThrow({ where: { id: created.id }, include: { staff: { select: { staffId: true } } } });
+      return tx.service.findUniqueOrThrow({
+        where: { id: created.id },
+        include: { staff: { select: { staffId: true } } },
+      });
     });
-    await this.audit.log({ actorUserId, businessId: tenant.businessId, action: 'service.create', targetType: 'Service', targetId: service.id });
+    await this.audit.log({
+      actorUserId,
+      businessId: tenant.businessId,
+      action: 'service.create',
+      targetType: 'Service',
+      targetId: service.id,
+    });
     return serializeService(service, tenant.currency);
   }
 
   async update(tenant: TenantContext, actorUserId: string, id: string, dto: UpdateServiceDto) {
-    const existing = await this.prisma.service.findFirst({ where: { id, businessId: tenant.businessId } });
+    const existing = await this.prisma.service.findFirst({
+      where: { id, businessId: tenant.businessId },
+    });
     if (!existing) throw notFound('SERVICE_NOT_FOUND');
     const { staffIds, price, ...data } = dto;
     const service = await this.prisma.$transaction(async (tx) => {
@@ -115,20 +130,38 @@ export class ServicesService {
         data: { ...data, ...(price !== undefined ? { price: new Prisma.Decimal(price) } : {}) },
       });
       if (staffIds) {
-        await tx.staffService.deleteMany({ where: { businessId: tenant.businessId, serviceId: id } });
+        await tx.staffService.deleteMany({
+          where: { businessId: tenant.businessId, serviceId: id },
+        });
         await this.assignStaff(tx, tenant.businessId, id, staffIds);
       }
-      return tx.service.findUniqueOrThrow({ where: { id }, include: { staff: { select: { staffId: true } } } });
+      return tx.service.findUniqueOrThrow({
+        where: { id },
+        include: { staff: { select: { staffId: true } } },
+      });
     });
-    await this.audit.log({ actorUserId, businessId: tenant.businessId, action: 'service.update', targetType: 'Service', targetId: id });
+    await this.audit.log({
+      actorUserId,
+      businessId: tenant.businessId,
+      action: 'service.update',
+      targetType: 'Service',
+      targetId: id,
+    });
     return serializeService(service, tenant.currency);
   }
 
-  private async assignStaff(tx: Prisma.TransactionClient, businessId: string, serviceId: string, staffIds: string[]) {
+  private async assignStaff(
+    tx: Prisma.TransactionClient,
+    businessId: string,
+    serviceId: string,
+    staffIds: string[],
+  ) {
     const unique = [...new Set(staffIds)];
     const found = await tx.staff.count({ where: { businessId, id: { in: unique } } });
     if (found !== unique.length) throw badRequest('STAFF_NOT_IN_BUSINESS');
-    await tx.staffService.createMany({ data: unique.map((staffId) => ({ businessId, staffId, serviceId })) });
+    await tx.staffService.createMany({
+      data: unique.map((staffId) => ({ businessId, staffId, serviceId })),
+    });
   }
 }
 
@@ -160,5 +193,9 @@ export class ServicesController {
   }
 }
 
-@Module({ controllers: [ServicesController], providers: [ServicesService], exports: [ServicesService] })
+@Module({
+  controllers: [ServicesController],
+  providers: [ServicesService],
+  exports: [ServicesService],
+})
 export class ServicesModule {}

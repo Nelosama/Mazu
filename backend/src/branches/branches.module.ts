@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Injectable, Module, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Injectable,
+  Module,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { RecordStatus } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
@@ -40,18 +51,38 @@ export class BranchesService {
   async create(tenant: TenantContext, actorUserId: string, dto: CreateBranchDto) {
     await this.plans.assertCanAddBranch(tenant.businessId);
     const branch = await this.prisma.branch.create({
-      data: { businessId: tenant.businessId, name: dto.name, address: dto.address, timezone: dto.timezone ?? tenant.timezone },
+      data: {
+        businessId: tenant.businessId,
+        name: dto.name,
+        address: dto.address,
+        timezone: dto.timezone ?? tenant.timezone,
+      },
     });
-    await this.audit.log({ actorUserId, businessId: tenant.businessId, action: 'branch.create', targetType: 'Branch', targetId: branch.id });
+    await this.audit.log({
+      actorUserId,
+      businessId: tenant.businessId,
+      action: 'branch.create',
+      targetType: 'Branch',
+      targetId: branch.id,
+    });
     return branch;
   }
 
   async update(tenant: TenantContext, actorUserId: string, id: string, dto: UpdateBranchDto) {
-    const existing = await this.prisma.branch.findFirst({ where: { id, businessId: tenant.businessId } });
+    const existing = await this.prisma.branch.findFirst({
+      where: { id, businessId: tenant.businessId },
+    });
     if (!existing) throw notFound('BRANCH_NOT_FOUND');
-    if (dto.status === 'ACTIVE' && existing.status !== 'ACTIVE') await this.plans.assertCanAddBranch(tenant.businessId);
+    if (dto.status === 'ACTIVE' && existing.status !== 'ACTIVE')
+      await this.plans.assertCanAddBranch(tenant.businessId);
     const branch = await this.prisma.branch.update({ where: { id }, data: dto });
-    await this.audit.log({ actorUserId, businessId: tenant.businessId, action: 'branch.update', targetType: 'Branch', targetId: id });
+    await this.audit.log({
+      actorUserId,
+      businessId: tenant.businessId,
+      action: 'branch.update',
+      targetType: 'Branch',
+      targetId: id,
+    });
     return branch;
   }
 }
@@ -84,5 +115,9 @@ export class BranchesController {
   }
 }
 
-@Module({ controllers: [BranchesController], providers: [BranchesService], exports: [BranchesService] })
+@Module({
+  controllers: [BranchesController],
+  providers: [BranchesService],
+  exports: [BranchesService],
+})
 export class BranchesModule {}

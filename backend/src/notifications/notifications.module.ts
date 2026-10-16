@@ -44,7 +44,10 @@ export class NotificationsController {
 
   @Get()
   async list(@Tenant() t: TenantContext) {
-    return { providers: this.notifications.providerStatus(), items: await this.notifications.list(t.businessId) };
+    return {
+      providers: this.notifications.providerStatus(),
+      items: await this.notifications.list(t.businessId),
+    };
   }
 }
 

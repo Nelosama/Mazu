@@ -10,7 +10,18 @@ import { PlansService } from '../subscriptions/plans.service';
 import { CreateBusinessDto, UpdateBusinessDto } from './dto';
 import { publicFileUrl } from '../storage/public-url';
 
-const RESERVED_SLUGS = new Set(['admin', 'app', 'api', 'login', 'register', 'www', 'b', 'm', 'f', 'static']);
+const RESERVED_SLUGS = new Set([
+  'admin',
+  'app',
+  'api',
+  'login',
+  'register',
+  'www',
+  'b',
+  'm',
+  'f',
+  'static',
+]);
 
 @Injectable()
 export class BusinessesService {
@@ -54,7 +65,13 @@ export class BusinessesService {
       },
     });
     await this.audit.log(
-      { actorUserId: ownerUserId, businessId: business.id, action: 'business.create', targetType: 'Business', targetId: business.id },
+      {
+        actorUserId: ownerUserId,
+        businessId: business.id,
+        action: 'business.create',
+        targetType: 'Business',
+        targetId: business.id,
+      },
       tx,
     );
     return business;
@@ -63,15 +80,22 @@ export class BusinessesService {
   private async resolveSlug(tx: Tx, requested: string | undefined, name: string): Promise<string> {
     if (requested) {
       if (RESERVED_SLUGS.has(requested)) throw conflict('SLUG_TAKEN');
-      const exists = await tx.business.findUnique({ where: { slug: requested }, select: { id: true } });
+      const exists = await tx.business.findUnique({
+        where: { slug: requested },
+        select: { id: true },
+      });
       if (exists) throw conflict('SLUG_TAKEN');
       return requested;
     }
     let base = slugify(name);
     if (base.length < 3) base = `negocio-${base}`.replace(/-+$/, '');
     for (let i = 0; i < 5; i++) {
-      const candidate = i === 0 && !RESERVED_SLUGS.has(base) ? base : `${base}-${randomBytes(2).toString('hex')}`;
-      const exists = await tx.business.findUnique({ where: { slug: candidate }, select: { id: true } });
+      const candidate =
+        i === 0 && !RESERVED_SLUGS.has(base) ? base : `${base}-${randomBytes(2).toString('hex')}`;
+      const exists = await tx.business.findUnique({
+        where: { slug: candidate },
+        select: { id: true },
+      });
       if (!exists) return candidate;
     }
     return `${base}-${randomBytes(4).toString('hex')}`;
@@ -93,7 +117,10 @@ export class BusinessesService {
   async get(businessId: string) {
     const business = await this.prisma.business.findUnique({
       where: { id: businessId },
-      include: { subscription: { include: { plan: true } }, branches: { orderBy: { createdAt: 'asc' } } },
+      include: {
+        subscription: { include: { plan: true } },
+        branches: { orderBy: { createdAt: 'asc' } },
+      },
     });
     if (!business) throw notFound('BUSINESS_NOT_FOUND');
     return {
@@ -110,7 +137,8 @@ export class BusinessesService {
   async update(businessId: string, actorUserId: string, dto: UpdateBusinessDto) {
     if (dto.primaryColor) {
       const features = await this.plans.featuresFor(businessId);
-      if (!features.customBranding) throw forbidden('PLAN_FEATURE_UNAVAILABLE', 'Personalización no incluida en el plan');
+      if (!features.customBranding)
+        throw forbidden('PLAN_FEATURE_UNAVAILABLE', 'Personalización no incluida en el plan');
     }
     if (dto.slug && RESERVED_SLUGS.has(dto.slug)) throw conflict('SLUG_TAKEN');
     try {

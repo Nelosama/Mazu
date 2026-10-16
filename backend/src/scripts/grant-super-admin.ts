@@ -12,8 +12,18 @@ async function main() {
   try {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) throw new Error(`No existe el usuario ${email}`);
-    await prisma.platformAdmin.upsert({ where: { userId: user.id }, create: { userId: user.id }, update: {} });
-    await prisma.auditLog.create({ data: { actorUserId: user.id, action: 'platform.grant_super_admin', metadata: { via: 'cli' } } });
+    await prisma.platformAdmin.upsert({
+      where: { userId: user.id },
+      create: { userId: user.id },
+      update: {},
+    });
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: user.id,
+        action: 'platform.grant_super_admin',
+        metadata: { via: 'cli' },
+      },
+    });
     console.warn(`✔ ${email} ahora es SUPER_ADMIN`);
   } finally {
     await prisma.$disconnect();

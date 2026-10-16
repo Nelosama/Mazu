@@ -25,26 +25,44 @@ export class WhatsAppCloudProvider implements NotificationProvider {
   ) {}
 
   async send(m: OutgoingMessage): Promise<SendResult> {
-    const res = await fetch(`https://graph.facebook.com/${this.apiVersion}/${this.phoneNumberId}/messages`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${this.accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: m.recipient.replace(/^\+/, ''),
-        type: 'template',
-        template: {
-          name: WHATSAPP_TEMPLATES[m.event],
-          language: { code: m.locale },
-          components: [{ type: 'body', parameters: m.templateParams.map((text) => ({ type: 'text', text })) }],
+    const res = await fetch(
+      `https://graph.facebook.com/${this.apiVersion}/${this.phoneNumberId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
         },
-      }),
-    }).catch((err: Error) => ({ ok: false, status: 0, text: async () => err.message }) as unknown as Response);
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to: m.recipient.replace(/^\+/, ''),
+          type: 'template',
+          template: {
+            name: WHATSAPP_TEMPLATES[m.event],
+            language: { code: m.locale },
+            components: [
+              {
+                type: 'body',
+                parameters: m.templateParams.map((text) => ({ type: 'text', text })),
+              },
+            ],
+          },
+        }),
+      },
+    ).catch(
+      (err: Error) =>
+        ({ ok: false, status: 0, text: async () => err.message }) as unknown as Response,
+    );
 
     if (res.ok) {
       const body = (await res.json().catch(() => ({}))) as { messages?: { id: string }[] };
       return { ok: true, providerMessageId: body.messages?.[0]?.id };
     }
     const text = await res.text().catch(() => '');
-    return { ok: false, retryable: res.status === 0 || res.status === 429 || res.status >= 500, error: `${res.status} ${text.slice(0, 300)}` };
+    return {
+      ok: false,
+      retryable: res.status === 0 || res.status === 429 || res.status >= 500,
+      error: `${res.status} ${text.slice(0, 300)}`,
+    };
   }
 }

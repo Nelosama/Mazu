@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /b/
+Disallow: /app/
+Disallow: /admin/
+Disallow: /m/
+Disallow: /f/

@@ -30,16 +30,27 @@ export class MembersService {
   async list(businessId: string) {
     const items = await this.prisma.businessMembership.findMany({
       where: { businessId },
-      include: { user: { select: { id: true, name: true, email: true } }, staff: { select: { id: true, name: true } } },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        staff: { select: { id: true, name: true } },
+      },
       orderBy: { createdAt: 'asc' },
     });
-    return items.map((m) => ({ id: m.id, role: m.role, status: m.status, user: m.user, staff: m.staff }));
+    return items.map((m) => ({
+      id: m.id,
+      role: m.role,
+      status: m.status,
+      user: m.user,
+      staff: m.staff,
+    }));
   }
 
   async add(tenant: TenantContext, actorUserId: string, dto: AddMemberDto) {
     if (dto.role === 'OWNER' && tenant.role !== 'OWNER') throw forbidden('INSUFFICIENT_ROLE');
     if (dto.staffId) {
-      const staff = await this.prisma.staff.findFirst({ where: { id: dto.staffId, businessId: tenant.businessId } });
+      const staff = await this.prisma.staff.findFirst({
+        where: { id: dto.staffId, businessId: tenant.businessId },
+      });
       if (!staff) throw badRequest('STAFF_NOT_IN_BUSINESS');
     }
     const membership = await this.prisma.$transaction(async (tx) => {
@@ -54,34 +65,64 @@ export class MembersService {
           },
         });
       }
-      const existing = await tx.businessMembership.findUnique({ where: { userId_businessId: { userId: user.id, businessId: tenant.businessId } } });
+      const existing = await tx.businessMembership.findUnique({
+        where: { userId_businessId: { userId: user.id, businessId: tenant.businessId } },
+      });
       if (existing) throw conflict('ALREADY_MEMBER');
       return tx.businessMembership.create({
-        data: { userId: user.id, businessId: tenant.businessId, role: dto.role, staffId: dto.staffId ?? null },
+        data: {
+          userId: user.id,
+          businessId: tenant.businessId,
+          role: dto.role,
+          staffId: dto.staffId ?? null,
+        },
       });
     });
-    await this.audit.log({ actorUserId, businessId: tenant.businessId, action: 'member.add', targetType: 'BusinessMembership', targetId: membership.id, metadata: { role: dto.role } });
+    await this.audit.log({
+      actorUserId,
+      businessId: tenant.businessId,
+      action: 'member.add',
+      targetType: 'BusinessMembership',
+      targetId: membership.id,
+      metadata: { role: dto.role },
+    });
     return membership;
   }
 
   async update(tenant: TenantContext, actorUserId: string, id: string, dto: UpdateMemberDto) {
-    const m = await this.prisma.businessMembership.findFirst({ where: { id, businessId: tenant.businessId } });
+    const m = await this.prisma.businessMembership.findFirst({
+      where: { id, businessId: tenant.businessId },
+    });
     if (!m) throw notFound('MEMBER_NOT_FOUND');
     const touchesOwner = m.role === 'OWNER' || dto.role === 'OWNER';
     if (touchesOwner && tenant.role !== 'OWNER') throw forbidden('INSUFFICIENT_ROLE');
-    if (m.role === 'OWNER' && (dto.role && dto.role !== 'OWNER' || dto.status === 'INACTIVE')) {
-      const owners = await this.prisma.businessMembership.count({ where: { businessId: tenant.businessId, role: 'OWNER', status: 'ACTIVE' } });
+    if (m.role === 'OWNER' && ((dto.role && dto.role !== 'OWNER') || dto.status === 'INACTIVE')) {
+      const owners = await this.prisma.businessMembership.count({
+        where: { businessId: tenant.businessId, role: 'OWNER', status: 'ACTIVE' },
+      });
       if (owners <= 1) throw conflict('LAST_OWNER');
     }
     if (dto.staffId) {
-      const staff = await this.prisma.staff.findFirst({ where: { id: dto.staffId, businessId: tenant.businessId } });
+      const staff = await this.prisma.staff.findFirst({
+        where: { id: dto.staffId, businessId: tenant.businessId },
+      });
       if (!staff) throw badRequest('STAFF_NOT_IN_BUSINESS');
     }
     const updated = await this.prisma.businessMembership.update({ where: { id }, data: dto });
     if (dto.status === 'INACTIVE') {
-      await this.prisma.refreshToken.updateMany({ where: { userId: m.userId, revokedAt: null }, data: { revokedAt: new Date() } });
+      await this.prisma.refreshToken.updateMany({
+        where: { userId: m.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
     }
-    await this.audit.log({ actorUserId, businessId: tenant.businessId, action: 'member.update', targetType: 'BusinessMembership', targetId: id, metadata: { ...dto } });
+    await this.audit.log({
+      actorUserId,
+      businessId: tenant.businessId,
+      action: 'member.update',
+      targetType: 'BusinessMembership',
+      targetId: id,
+      metadata: { ...dto },
+    });
     return updated;
   }
 }
@@ -102,7 +143,9 @@ export class BusinessesController {
   /** Un usuario existente puede crear otro negocio (queda como OWNER). */
   @Post()
   async create(@CurrentUser() u: AuthUser, @Body() dto: CreateBusinessDto) {
-    const b = await this.prisma.$transaction((tx) => this.businesses.createWithOwner(tx, u.id, dto));
+    const b = await this.prisma.$transaction((tx) =>
+      this.businesses.createWithOwner(tx, u.id, dto),
+    );
     return this.businesses.get(b.id);
   }
 
@@ -136,7 +179,12 @@ export class BusinessesController {
   @UseGuards(TenantGuard)
   @Roles('OWNER', 'ADMIN')
   @Patch(':businessId/members/:id')
-  updateMember(@Tenant() t: TenantContext, @CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateMemberDto) {
+  updateMember(
+    @Tenant() t: TenantContext,
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateMemberDto,
+  ) {
     return this.members.update(t, u.id, id, dto);
   }
 }

@@ -13,7 +13,11 @@ const currencyCodes = new Set(
 );
 
 export function isValidCurrency(code: unknown): code is string {
-  return typeof code === 'string' && /^[A-Z]{3}$/.test(code) && (currencyCodes.size === 0 || currencyCodes.has(code));
+  return (
+    typeof code === 'string' &&
+    /^[A-Z]{3}$/.test(code) &&
+    (currencyCodes.size === 0 || currencyCodes.has(code))
+  );
 }
 
 export function isValidCountry(code: unknown): code is string {
@@ -45,10 +49,26 @@ function simpleDecorator(name: string, check: (v: unknown) => boolean, message: 
     });
 }
 
-export const IsTimezone = simpleDecorator('isTimezone', isValidTimezone, '$property debe ser una zona horaria IANA');
-export const IsCurrencyCode = simpleDecorator('isCurrencyCode', isValidCurrency, '$property debe ser ISO 4217');
-export const IsCountryCode = simpleDecorator('isCountryCode', isValidCountry, '$property debe ser ISO 3166-1 alfa-2');
-export const IsLocalDate = simpleDecorator('isLocalDate', isLocalDate, '$property debe tener formato YYYY-MM-DD');
+export const IsTimezone = simpleDecorator(
+  'isTimezone',
+  isValidTimezone,
+  '$property debe ser una zona horaria IANA',
+);
+export const IsCurrencyCode = simpleDecorator(
+  'isCurrencyCode',
+  isValidCurrency,
+  '$property debe ser ISO 4217',
+);
+export const IsCountryCode = simpleDecorator(
+  'isCountryCode',
+  isValidCountry,
+  '$property debe ser ISO 3166-1 alfa-2',
+);
+export const IsLocalDate = simpleDecorator(
+  'isLocalDate',
+  isLocalDate,
+  '$property debe tener formato YYYY-MM-DD',
+);
 
 export const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 export const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;

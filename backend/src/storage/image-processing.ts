@@ -25,7 +25,8 @@ export async function processImage(input: Buffer, maxSide: number): Promise<Proc
   if (!meta.format || !ALLOWED.has(meta.format)) {
     throw badRequest('UNSUPPORTED_IMAGE_TYPE', 'Formatos permitidos: JPEG, PNG, WebP, AVIF, HEIC');
   }
-  if ((meta.pages ?? 1) > 1) throw badRequest('UNSUPPORTED_IMAGE_TYPE', 'No se admiten imágenes animadas');
+  if ((meta.pages ?? 1) > 1)
+    throw badRequest('UNSUPPORTED_IMAGE_TYPE', 'No se admiten imágenes animadas');
   try {
     const { data, info } = await sharp(input, { limitInputPixels: 40_000_000 })
       .rotate()
