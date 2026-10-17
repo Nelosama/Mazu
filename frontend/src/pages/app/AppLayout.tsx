@@ -37,27 +37,45 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen lg:flex">
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-gray-200 bg-white lg:flex">
-        <div className="border-b border-gray-100 p-5">
-          <p className="truncate font-bold text-gray-900">{membership.business.name}</p>
-          <a
-            href={`/b/${membership.business.slug}`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs font-medium text-brand-ink hover:underline"
-          >
-            {t('nav.viewPublic')} ↗
-          </a>
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-line bg-white p-4 lg:flex">
+        <div className="px-2 pt-2">
+          <p className="text-2xl font-bold tracking-tight text-ink">
+            mazu<span className="text-brand">.</span>
+          </p>
         </div>
-        <nav className="flex-1 space-y-1 p-3" aria-label={t('nav.main')}>
+        <div className="mt-6 flex items-center gap-3 rounded-xl border border-line bg-white p-3">
+          <span
+            aria-hidden
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand text-sm font-semibold text-brand-fg"
+          >
+            {membership.business.name.charAt(0).toUpperCase()}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-ink">{membership.business.name}</p>
+            <a
+              href={`/b/${membership.business.slug}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-medium text-brand-ink hover:underline"
+            >
+              {t('nav.viewPublic')} ↗
+            </a>
+          </div>
+        </div>
+        <p className="mt-6 px-3 text-[11px] font-semibold tracking-widest text-gray-500 uppercase">
+          {t('nav.main')}
+        </p>
+        <nav className="mt-2 flex-1 space-y-1" aria-label={t('nav.main')}>
           {items.map((i) => (
             <NavLink
               key={i.to}
               to={i.to}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
-                  isActive ? 'bg-brand-soft text-brand-ink' : 'text-gray-700 hover:bg-gray-100',
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition',
+                  isActive
+                    ? 'bg-brand-soft text-brand-ink'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
                 )
               }
             >
@@ -70,8 +88,10 @@ export function AppLayout() {
               to={`${base}/team`}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium',
-                  isActive ? 'bg-brand-soft text-brand-ink' : 'text-gray-700 hover:bg-gray-100',
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition',
+                  isActive
+                    ? 'bg-brand-soft text-brand-ink'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
                 )
               }
             >
@@ -80,7 +100,7 @@ export function AppLayout() {
             </NavLink>
           )}
         </nav>
-        <div className="space-y-3 border-t border-gray-100 p-4">
+        <div className="space-y-3 border-t border-line pt-4">
           {me && me.memberships.length > 1 && (
             <NavLink to="/app" className="block text-sm text-gray-600 hover:text-gray-900">
               {t('nav.switchBusiness')}
