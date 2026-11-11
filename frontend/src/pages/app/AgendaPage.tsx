@@ -198,28 +198,41 @@ export function AgendaPage() {
       ) : view === 'staff' ? (
         <StaffList items={items} tz={tz} locale={locale} onSelect={setSelected} />
       ) : (
-        <TimeGrid
-          columns={
-            view === 'day'
-              ? activeStaff.map((s) => ({ key: s.id, label: s.name, staffId: s.id, date: day }))
-              : Array.from({ length: 7 }, (_, i) => {
-                  const d = range.from.plus({ days: i });
-                  return {
-                    key: d.toISODate()!,
-                    label: d.setLocale(locale).toFormat('ccc d'),
-                    staffId: focusStaff,
-                    date: d,
-                  };
-                })
-          }
-          items={items}
-          tz={tz}
-          locale={locale}
-          mode={view}
-          canCreate={(staffId) => !lockedStaffId || staffId === lockedStaffId}
-          onEmptyClick={(staffId, iso) => openQuick(staffId, iso)}
-          onSelect={setSelected}
-        />
+        <>
+          <div className="md:hidden">
+            <AppointmentList
+              items={items}
+              tz={tz}
+              locale={locale}
+              showStaff={view === 'day'}
+              onSelect={setSelected}
+            />
+          </div>
+          <div className="hidden md:block">
+            <TimeGrid
+              columns={
+                view === 'day'
+                  ? activeStaff.map((s) => ({ key: s.id, label: s.name, staffId: s.id, date: day }))
+                  : Array.from({ length: 7 }, (_, i) => {
+                      const d = range.from.plus({ days: i });
+                      return {
+                        key: d.toISODate()!,
+                        label: d.setLocale(locale).toFormat('ccc d'),
+                        staffId: focusStaff,
+                        date: d,
+                      };
+                    })
+              }
+              items={items}
+              tz={tz}
+              locale={locale}
+              mode={view}
+              canCreate={(staffId) => !lockedStaffId || staffId === lockedStaffId}
+              onEmptyClick={(staffId, iso) => openQuick(staffId, iso)}
+              onSelect={setSelected}
+            />
+          </div>
+        </>
       )}
 
       <QuickActionSheet
@@ -242,6 +255,94 @@ export function AgendaPage() {
         timezone={tz}
         staff={staffQ.data ?? []}
       />
+    </div>
+  );
+}
+
+function AppointmentList({
+  items,
+  tz,
+  locale,
+  showStaff,
+  onSelect,
+}: {
+  items: AdminAppointment[];
+  tz: string;
+  locale: string;
+  showStaff: boolean;
+  onSelect: (a: AdminAppointment) => void;
+}) {
+  const { t } = useTranslation();
+  const byDay = useMemo(() => {
+    const map = new Map<string, AdminAppointment[]>();
+    for (const appointment of items) {
+      const dateKey = DateTime.fromISO(appointment.startsAt, { zone: tz }).toISODate()!;
+      map.set(dateKey, [...(map.get(dateKey) ?? []), appointment]);
+    }
+    return [...map.entries()].map(
+      ([dateKey, appointments]) =>
+        [
+          dateKey,
+          appointments.toSorted(
+            (a, b) =>
+              DateTime.fromISO(a.startsAt).toMillis() - DateTime.fromISO(b.startsAt).toMillis(),
+          ),
+        ] as const,
+    );
+  }, [items, tz]);
+
+  if (!byDay.length)
+    return <EmptyState title={t('agenda.emptyTitle')} description={t('agenda.emptyText')} />;
+
+  return (
+    <div className="space-y-5">
+      {byDay.map(([dateKey, appointments]) => (
+        <section key={dateKey}>
+          <h2 className="mb-2 text-sm font-semibold capitalize text-gray-500">
+            {DateTime.fromISO(dateKey, { zone: tz }).setLocale(locale).toFormat('cccc d LLLL')}
+          </h2>
+          <ul className="divide-y divide-gray-100 overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200">
+            {appointments.map((appointment) => (
+              <li key={appointment.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(appointment)}
+                  className="flex min-h-16 w-full items-center gap-3 px-3 py-3 text-left hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand sm:px-4"
+                >
+                  <span
+                    className={cn(
+                      'h-10 w-1 shrink-0 rounded-full',
+                      appointment.type === 'ONLINE'
+                        ? 'bg-brand'
+                        : appointment.type === 'WALK_IN'
+                          ? 'bg-amber-500'
+                          : 'bg-gray-400',
+                    )}
+                    aria-hidden="true"
+                  />
+                  <span className="w-[4.25rem] shrink-0 text-sm font-semibold text-gray-900">
+                    {formatTime(appointment.startsAt, tz, locale)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-gray-900">
+                      {appointment.type === 'BLOCKED'
+                        ? t(`blockReason.${appointment.blockReason ?? 'OTHER'}`)
+                        : (appointment.customer?.name ??
+                          appointment.walkInName ??
+                          t('types.WALK_IN'))}
+                    </span>
+                    <span className="block truncate text-sm text-gray-500">
+                      {showStaff ? `${appointment.staff.name} · ` : ''}
+                      {appointment.service?.name ?? t(`types.${appointment.type}`)}
+                    </span>
+                  </span>
+                  <StatusBadge status={appointment.status} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

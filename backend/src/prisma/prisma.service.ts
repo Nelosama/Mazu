@@ -32,6 +32,17 @@ export function isExclusionViolation(err: unknown): boolean {
   return false;
 }
 
+/** PostgreSQL SQLSTATE 40P01. Concurrent GiST exclusion checks can deadlock before one booking wins. */
+export function isDeadlock(err: unknown): boolean {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    return err.code === 'P2034' || err.message.includes('40P01');
+  }
+  if (err instanceof Prisma.PrismaClientUnknownRequestError) {
+    return err.message.includes('40P01');
+  }
+  return err instanceof Error && err.message.includes('40P01');
+}
+
 export function isUniqueViolation(err: unknown, field?: string): boolean {
   if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
     if (!field) return true;

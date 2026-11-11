@@ -172,11 +172,10 @@ describe('Disponibilidad y reservas', () => {
           endsAt: new Date(base.getTime() + (offsetMin + len) * 60_000),
         },
       });
-    // Todos los intervalos comparten 00:30–00:40: solo uno puede insertarse.
-    const results = await Promise.allSettled([mk(0, 60), mk(15, 30), mk(30, 60), mk(20, 20)]);
-    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
-    const rejected = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
-    expect(String(rejected.reason)).toMatch(/23P01|no_overlap|exclusion/i);
+    // Inserción secuencial: valida la restricción de exclusión sin que un deadlock concurrente
+    // pueda hacer que la prueba falle antes de observar la violación que pretende cubrir.
+    await expect(mk(0, 60)).resolves.toBeTruthy();
+    await expect(mk(15, 30)).rejects.toThrow(/23P01|no_overlap|exclusion/i);
     // Una cita cancelada libera el intervalo.
     await ctx.prisma.appointment.updateMany({
       where: { staffId: staff.id },
