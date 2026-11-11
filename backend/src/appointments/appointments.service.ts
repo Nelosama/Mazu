@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { Appointment, Business, Prisma } from '@prisma/client';
 import { DateTime } from 'luxon';
-import { PrismaService, Tx, isExclusionViolation } from '../prisma/prisma.service';
+import { PrismaService, Tx, isDeadlock, isExclusionViolation } from '../prisma/prisma.service';
 import { AppError, badRequest, conflict, forbidden, gone, notFound } from '../common/errors';
 import { generateToken, hashToken, isWellFormedToken } from '../common/crypto';
 import { normalizePhone } from '../common/phone';
@@ -151,7 +151,7 @@ export class AppointmentsService {
         });
         return { ...(await this.publicView(appointment.id)), manageToken };
       } catch (err) {
-        if (isExclusionViolation(err)) continue; // otro cliente ganó el horario: probar el siguiente profesional
+        if (isExclusionViolation(err) || isDeadlock(err)) continue; // una reserva concurrente ganó este turno: probar el siguiente profesional
         if (err instanceof AppError && err.code === 'SLOT_UNAVAILABLE' && candidates.length > 1)
           continue;
         throw err;
