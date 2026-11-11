@@ -279,12 +279,16 @@ function AppointmentList({
       const dateKey = DateTime.fromISO(appointment.startsAt, { zone: tz }).toISODate()!;
       map.set(dateKey, [...(map.get(dateKey) ?? []), appointment]);
     }
-    return [...map.entries()].map(([dateKey, appointments]) => [
-      dateKey,
-      appointments.toSorted(
-        (a, b) => DateTime.fromISO(a.startsAt).toMillis() - DateTime.fromISO(b.startsAt).toMillis(),
-      ),
-    ] as const);
+    return [...map.entries()].map(
+      ([dateKey, appointments]) =>
+        [
+          dateKey,
+          appointments.toSorted(
+            (a, b) =>
+              DateTime.fromISO(a.startsAt).toMillis() - DateTime.fromISO(b.startsAt).toMillis(),
+          ),
+        ] as const,
+    );
   }, [items, tz]);
 
   if (!byDay.length)
@@ -328,9 +332,7 @@ function AppointmentList({
                           t('types.WALK_IN'))}
                     </span>
                     <span className="block truncate text-sm text-gray-500">
-                      {showStaff
-                        ? `${appointment.staff.name} · `
-                        : ''}
+                      {showStaff ? `${appointment.staff.name} · ` : ''}
                       {appointment.service?.name ?? t(`types.${appointment.type}`)}
                     </span>
                   </span>
